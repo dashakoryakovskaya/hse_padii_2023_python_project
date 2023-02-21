@@ -8,7 +8,9 @@ def ensure_connection(func):
         with sqlite3.connect('user.db') as conn:
             res = func(*args, conn=conn, **kwargs)
         return res
+
     return inner
+
 
 """def get_connection():
     global __connection
@@ -16,9 +18,10 @@ def ensure_connection(func):
         __connection = sqlite3.connect('user.db')
     return __connection """
 
+
 @ensure_connection
 def init_db(conn, flag_drop: bool = False):
-    #conn = get_connection()
+    # conn = get_connection()
     c = conn.cursor()
 
     if flag_drop:
@@ -53,27 +56,40 @@ def init_db(conn, flag_drop: bool = False):
 
     conn.commit()
 
+
+@ensure_connection
+def add_user(conn, user_id: int, name: str):
+    # conn = get_connection()
+    c = conn.cursor()
+    c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;',
+              (user_id, name))
+    conn.commit()
+
+
 @ensure_connection
 def add_expenses(conn, user_id: int, name: str, sum: int, type: str, date: str):
-    #conn = get_connection()
+    # conn = get_connection()
     c = conn.cursor()
-    c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;', (user_id, name))
+    # пока один пользователь - добавляем его при start
+    # c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;', (user_id, name))
     c.execute('INSERT INTO expenses (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
     conn.commit()
 
+
 @ensure_connection
 def add_incomes(conn, user_id: int, name: str, sum: int, type: str, date: str):
-    #conn = get_connection()
+    # conn = get_connection()
     c = conn.cursor()
-    c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;', (user_id, name))
+    # пока один пользователь - добавляем его при start
+    # c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;', (user_id, name))
     c.execute('INSERT INTO incomes (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
     conn.commit()
-@ensure_connection
-def select(conn):
-    #conn = get_connection()
-    c = conn.cursor()
-    c.execute('SELECT * FROM user;')
-    (res,) = c.fetchall()
-    conn.commit()
-    return res
 
+
+@ensure_connection
+def sql_execute(conn, sql: str):
+    # conn = get_connection()
+    c = conn.cursor()
+    c.execute(sql)
+    res = c.fetchall()
+    return res
