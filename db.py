@@ -28,6 +28,7 @@ def init_db(conn, flag_drop: bool = False):
         c.execute('DROP TABLE IF EXISTS user')
         c.execute('DROP TABLE IF EXISTS expenses')
         c.execute('DROP TABLE IF EXISTS incomes')
+        c.execute('DROP TABLE IF EXISTS balance')
 
     c.execute('''
     CREATE TABLE IF NOT EXISTS user (
@@ -54,6 +55,13 @@ def init_db(conn, flag_drop: bool = False):
         type TEXT
         );''')
 
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS balance (
+        id INTEGER PRIMARY KEY, 
+        user_id INTEGER NOT NULL UNIQUE,
+        total BIGINT
+        );''')
+
     conn.commit()
 
 
@@ -63,6 +71,8 @@ def add_user(conn, user_id: int, name: str):
     c = conn.cursor()
     c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;',
               (user_id, name))
+    c.execute('INSERT INTO balance (user_id, total) VALUES (?, ?);',
+              (user_id, 0))
     conn.commit()
 
 
@@ -73,6 +83,7 @@ def add_expenses(conn, user_id: int, name: str, sum: int, type: str, date: str):
     # пока один пользователь - добавляем его при start
     # c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;', (user_id, name))
     c.execute('INSERT INTO expenses (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
+    c.execute(f'UPDATE balance SET total = (SELECT total FROM balance WHERE user_id={user_id}) - {sum} WHERE user_id={user_id};')
     conn.commit()
 
 
@@ -83,6 +94,7 @@ def add_incomes(conn, user_id: int, name: str, sum: int, type: str, date: str):
     # пока один пользователь - добавляем его при start
     # c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;', (user_id, name))
     c.execute('INSERT INTO incomes (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
+    c.execute(f'UPDATE balance SET total = {sum} + (SELECT total FROM balance WHERE user_id={user_id}) WHERE user_id={user_id};')
     conn.commit()
 
 

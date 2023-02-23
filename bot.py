@@ -13,6 +13,8 @@ def list_of_tuples_to_str(list_tup: list):
         string += ' '.join(map(str, row)) + '\n'
     return string
 
+def one_tuple_to_str(tup: tuple):
+    return str(tup[0][0])
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -21,7 +23,8 @@ def start_message(message):
                                       "-sum - траты \n"
                                       "user_data - информация о пользователях\n"
                                       "incomes_data - информация о поступлениях\n"
-                                      "expenses_data - информация о тратах")
+                                      "expenses_data - информация о тратах\n"
+                                      "check balance - проверить баланс))")
     db.add_user(user_id=message.from_user.id, name=message.from_user.first_name)
     # bot.send_message(message.chat.id, str(threading.current_thread().ident))
 
@@ -42,6 +45,8 @@ def repeat_all_messages(message):
                                                                                                           "FROM " +
                                                                                                           message.text[
                                                                                                           :-5])))
+    if message.text == 'check balance':
+        bot.send_message(message.chat.id, 'balance' + ':\n' + one_tuple_to_str(db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={message.from_user.id};")))
 
 
 def main():
