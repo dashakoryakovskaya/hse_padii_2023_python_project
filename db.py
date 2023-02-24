@@ -58,7 +58,7 @@ def init_db(conn, flag_drop: bool = False):
     c.execute('''
         CREATE TABLE IF NOT EXISTS balance (
         id INTEGER PRIMARY KEY, 
-        user_id INTEGER NOT NULL UNIQUE,
+        user_id INTEGER NOT NULL,
         total BIGINT
         );''')
 
@@ -99,7 +99,7 @@ def add_incomes(conn, user_id: int, name: str, sum: int, type: str, date: str):
 
 
 @ensure_connection
-def sql_execute(conn, sql: str):
+def sql_execute(conn, sql):
     # conn = get_connection()
     c = conn.cursor()
     c.execute(sql)
