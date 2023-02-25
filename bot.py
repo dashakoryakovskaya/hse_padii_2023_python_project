@@ -4,8 +4,12 @@ import config
 import telebot
 import db
 from telebot import types
+from datetime import datetime
+import time
 
 bot = telebot.TeleBot(config.token)
+
+tconv = lambda x: time.strftime("%Y-%m-%d", time.localtime(x))
 
 
 def list_of_tuples_to_str(list_tup: list):
@@ -49,7 +53,10 @@ def stop(message):
 
 def add_expenses_or_incomes_menu(message, user_id, type, ex_in):
     if message.text.isdigit() and int(message.text) >= 0:
-        mesg = bot.send_message(message.chat.id, "Введите дату в формате YYYY-MM-DD:")
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        btn1 = types.KeyboardButton("Текущая дата")
+        markup.add(btn1)
+        mesg = bot.send_message(message.chat.id, "Введите дату в формате YYYY-MM-DD или выберите текущую дату:", reply_markup=markup)
         bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, type=type,
                                                                 sum=int(message.text), ex_in=ex_in))
     else:
@@ -67,6 +74,13 @@ def add_cat(message, user_id, type_name, ex_in):
 
 
 def add_date(message, user_id, type, sum, ex_in):
+    if message.text == "Текущая дата":
+        # datetime.utcfromtimestamp(message.date).strftime('%Y-%m-%d')
+        db.add_money_transfer(user_id=user_id, sum=sum, type=type,
+                              date=tconv(message.date), ex_in=ex_in)
+        bot.send_message(message.chat.id, text="Записано!")
+        bot.send_message(message.chat.id, text="Меню", reply_markup=menu_key())
+        return
     # TODO: проверять длину месяца (апрель - 30 и тд)
     if len(message.text) != 10 or message.text[4] != "-" or message.text[7] != "-" or not message.text[0:4].isdigit() \
             or not message.text[5:7].isdigit() or not message.text[8:10].isdigit() \
@@ -131,7 +145,7 @@ def callback_query(call):
 
         if call.data[:len("incomes_")] == "incomes_":
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
-            #bot.answer_callback_query(call.id, "Введите сумму")
+            # bot.answer_callback_query(call.id, "Введите сумму")
             mesg = bot.send_message(call.message.chat.id, "Введите сумму")
             bot.register_next_step_handler(mesg,
                                            lambda m: add_expenses_or_incomes_menu(message=m, user_id=call.from_user.id,
@@ -150,7 +164,7 @@ def callback_query(call):
 
         if call.data[:len("add_cat_")] == "add_cat_":
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
-            #bot.answer_callback_query(call.id, "Введите категорию")
+            # bot.answer_callback_query(call.id, "Введите категорию")
             mesg = bot.send_message(call.message.chat.id, "Введите категорию")
             bot.register_next_step_handler(mesg,
                                            lambda m: add_cat(message=m, user_id=call.from_user.id, type_name=m.text,
