@@ -55,7 +55,14 @@ def add_expenses_or_incomes_menu(message, user_id, name, type, ex_in):
 
 
 def add_date(message, user_id, name, type, sum, ex_in):
-    if len(message.text) == 10:
+    if len(message.text) != 10 or message.text[4] != "-" or message.text[7] != "-" or not message.text[0:4].isdigit() \
+            or not message.text[5:7].isdigit() or not message.text[8:10].isdigit() \
+            or (12 < int(message.text[5:7]) or int(message.text[5:7]) < 1) \
+            or (31 < int(message.text[8:10]) or int(message.text[8:10]) < 1):
+        mesg = bot.send_message(message.chat.id, "Неправильный формат :(\nВведите еще раз:")
+        bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, name=name, type=type,
+                                                                sum=sum, ex_in=ex_in))
+    else:
         if ex_in == "ex":
             db.add_expenses(user_id=user_id, name=name, sum=sum, type=type, date=message.text)
         else:
@@ -67,13 +74,8 @@ def add_date(message, user_id, name, type, sum, ex_in):
         key.add(but_1, but_2, but_3)
         bot.send_message(message.chat.id, text="Записано!")
         bot.send_message(message.chat.id, text="Меню", reply_markup=key)
-    else:
-        mesg = bot.send_message(message.chat.id, "Неправильный формат :(\nВведите еще раз:")
-        bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, name=name, type=type,
-                                                                sum=sum, ex_in=ex_in))
 
 
-# TODO: даты в расходах и доходах (пока что дата сообщения)!
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     if call.message:
