@@ -27,8 +27,6 @@ def start_message(message):
     but_3 = types.InlineKeyboardButton(text="Статистика", callback_data="data")
     key.add(but_1, but_2, but_3)
     bot.send_message(message.chat.id, "Привет ✌️ Я - бот для отслеживания твоих финансов! \n"
-                                      "+sum - поступления \n"
-                                      "-sum - траты \n"
                                       "user_data - информация о пользователях\n"
                                       "incomes_data - информация о поступлениях\n"
                                       "expenses_data - информация о тратах\n"
@@ -36,25 +34,24 @@ def start_message(message):
     db.add_user(user_id=message.from_user.id, name=message.from_user.first_name)
     # bot.send_message(message.chat.id, str(threading.current_thread().ident))
 
+# TODO: нужна /stop команда?
+@bot.message_handler(commands=['stop'])
+def stop(message):
+    bot.send_message(message.chat.id, "До встречи!")
+    bot.stop_polling()
 
-# TODO: оптимизировать! в 1 функцию
-def expense_f(message, user_id, name, sum, type, date):
-    db.add_expenses(user_id=user_id, name=name, sum=sum, type=type, date=date)
+
+def add_expenses_or_incomes_menu(message, user_id, name, sum, type, date, ex_in):
+    if ex_in == "ex":
+        db.add_expenses(user_id=user_id, name=name, sum=sum, type=type, date=date)
+    else:
+        db.add_incomes(user_id=user_id, name=name, sum=sum, type=type, date=date)
     key = types.InlineKeyboardMarkup()
     but_1 = types.InlineKeyboardButton(text="Траты", callback_data="expenses")
     but_2 = types.InlineKeyboardButton(text="Поступления", callback_data="incomes")
     but_3 = types.InlineKeyboardButton(text="Статистика", callback_data="data")
     key.add(but_1, but_2, but_3)
-    bot.send_message(message.chat.id, text="Меню", reply_markup=key)
-
-
-def incomes_f(message, user_id, name, sum, type, date):
-    db.add_incomes(user_id=user_id, name=name, sum=sum, type=type, date=date)
-    key = types.InlineKeyboardMarkup()
-    but_1 = types.InlineKeyboardButton(text="Траты", callback_data="expenses")
-    but_2 = types.InlineKeyboardButton(text="Поступления", callback_data="incomes")
-    but_3 = types.InlineKeyboardButton(text="Статистика", callback_data="data")
-    key.add(but_1, but_2, but_3)
+    bot.send_message(message.chat.id, text="Записано!")
     bot.send_message(message.chat.id, text="Меню", reply_markup=key)
 
 
@@ -68,8 +65,8 @@ def callback_query(call):
             but_2 = types.InlineKeyboardButton(text="Поступления", callback_data="incomes")
             but_3 = types.InlineKeyboardButton(text="Статистика", callback_data="data")
             key.add(but_1, but_2, but_3)
-            bot.send_message(chat_id=call.message.chat.id, text="Меню", reply_markup=key)
-            # bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Меню", reply_markup=key)
+            #bot.send_message(chat_id=call.message.chat.id, text="Меню", reply_markup=key)
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Меню", reply_markup=key)
         if call.data == "expenses":
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="Еда", callback_data="expenses_food")
@@ -77,21 +74,22 @@ def callback_query(call):
             but_3 = types.InlineKeyboardButton(text="Развлечения", callback_data="expenses_entertainment")
             but_4 = types.InlineKeyboardButton(text="Меню", callback_data="menu")
             key.add(but_1, but_2, but_3, but_4)
-            bot.send_message(chat_id=call.message.chat.id, text="Выберите категорию:", reply_markup=key)
-            # bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Выберите категорию:", reply_markup=key)
+            #bot.send_message(chat_id=call.message.chat.id, text="Выберите категорию:", reply_markup=key)
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Выберите категорию:", reply_markup=key)
         if call.data[:len("expenses_")] == "expenses_":
             bot.answer_callback_query(call.id, "Ведите сумму")
             mesg = bot.send_message(call.message.chat.id, "Введите сумму")
             bot.register_next_step_handler(mesg,
-                                           lambda m: expense_f(message=m, user_id=call.message.from_user.id, name="",
-                                                               sum=int(m.text),
-                                                               type=call.data[len("expenses_"):],
-                                                               date=mesg.date))
+                                           lambda m: add_expenses_or_incomes_menu(message=m,
+                                                                                  user_id=call.from_user.id,
+                                                                                  name="",
+                                                                                  sum=int(m.text),
+                                                                                  type=call.data[len("expenses_"):],
+                                                                                  date=mesg.date, ex_in="ex"))
             '''bot.register_next_step_handler(mesg, lambda m: db.add_expenses(user_id=call.message.from_user.id, name="",
                                                                            sum=int(m.text),
                                                                            type=call.data[len("expenses_"):],
                                                                            date=mesg.date)) '''
-            # TODO: нужно ли отвечать "Записано!"
 
         if call.data == "incomes":
             key = types.InlineKeyboardMarkup()
@@ -99,37 +97,49 @@ def callback_query(call):
             but_2 = types.InlineKeyboardButton(text="Подарок", callback_data="incomes_gift")
             but_3 = types.InlineKeyboardButton(text="Меню", callback_data="menu")
             key.add(but_1, but_2, but_3)
-            bot.send_message(chat_id=call.message.chat.id, text="Выберите категорию:", reply_markup=key)
-            # bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Выберите категорию:", reply_markup=key)
+            # bot.send_message(chat_id=call.message.chat.id, text="Выберите категорию:", reply_markup=key)
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Выберите категорию:", reply_markup=key)
 
         if call.data[:len("incomes_")] == "incomes_":
             bot.answer_callback_query(call.id, "Ведите сумму")
             mesg = bot.send_message(call.message.chat.id, "Введите сумму")
             bot.register_next_step_handler(mesg,
-                                           lambda m: incomes_f(message=m, user_id=call.message.from_user.id, name="",
-                                                               sum=int(m.text),
-                                                               type=call.data[len("incomes_"):],
-                                                               date=mesg.date))
+                                           lambda m: add_expenses_or_incomes_menu(message=m,
+                                                                                  user_id=call.from_user.id,
+                                                                                  name="",
+                                                                                  sum=int(m.text),
+                                                                                  type=call.data[len("incomes_"):],
+                                                                                  date=mesg.date, ex_in="in"))
             '''bot.register_next_step_handler(mesg, lambda m: db.add_incomes(user_id=call.message.from_user.id, name="",
                                                                           sum=int(m.text),
                                                                           type=call.data[len("incomes_"):],
                                                                           date=mesg.date)) '''
-            # TODO: нужно ли отвечать "Записано!"
 
         if call.data == "data":
-            bot.send_message(chat_id=call.message.chat.id, text="data")
+            key = types.InlineKeyboardMarkup()
+            but_1 = types.InlineKeyboardButton(text="Баланс", callback_data="data_balance")
+            but_2 = types.InlineKeyboardButton(text="Расходы", callback_data="data_expenses")
+            but_3 = types.InlineKeyboardButton(text="Доходы", callback_data="data_incomes")
+            but_4 = types.InlineKeyboardButton(text="Меню", callback_data="menu")
+            key.add(but_1, but_2, but_3, but_4)
+            # bot.send_message(chat_id=call.message.chat.id, text="Выберите категорию:", reply_markup=key)
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                  text="Выберите категорию:", reply_markup=key)
+
+        if call.data == "data_balance":
+            bot.send_message(call.message.chat.id, 'balance' + ':\n' + one_tuple_to_str(
+                db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={call.from_user.id};")))
 
 
 @bot.message_handler(content_types=["text"])
 def messages(message):
     # bot.send_message(message.chat.id, str(threading.current_thread().ident))
-    # TODO: сделать это все через меню / кнопки, категории!!
-    if message.text[0] == '+':
+    '''if message.text[0] == '+':
         db.add_incomes(user_id=message.from_user.id, name=message.from_user.username, date=message.date,
                        sum=int(message.text[1:]), type='')
     if message.text[0] == '-':
         db.add_expenses(user_id=message.from_user.id, name=message.from_user.username, date=message.date,
-                        sum=int(message.text[1:]), type='')
+                        sum=int(message.text[1:]), type='') '''
     # вся информация из таблицы по запросу имятаблицы_data
     if message.text[-4:] == 'data':
         bot.send_message(message.chat.id, message.text + ':\n' + list_of_tuples_to_str(db.sql_execute(sql="SELECT * "
