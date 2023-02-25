@@ -42,15 +42,15 @@ def stop(message):
     bot.stop_polling()
 
 
-def add_expenses_or_incomes_menu(message, user_id, name, type, ex_in):
+def add_expenses_or_incomes_menu(message, user_id, type, ex_in):
     if message.text.isdigit() and int(message.text) >= 0:
         mesg = bot.send_message(message.chat.id, "Введите дату в формате YYYY-MM-DD:")
-        bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, name=name, type=type,
+        bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, type=type,
                                                                 sum=int(message.text), ex_in=ex_in))
     else:
         mesg = bot.send_message(message.chat.id, "Неправильный формат суммы :(\nВведите еще раз:")
         bot.register_next_step_handler(mesg,
-                                       lambda m: add_expenses_or_incomes_menu(message=m, user_id=user_id, name=name,
+                                       lambda m: add_expenses_or_incomes_menu(message=m, user_id=user_id,
                                                                               type=type, ex_in=ex_in))
 
 
@@ -64,10 +64,7 @@ def add_date(message, user_id, name, type, sum, ex_in):
         bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, name=name, type=type,
                                                                 sum=sum, ex_in=ex_in))
     else:
-        if ex_in == "ex":
-            db.add_expenses(user_id=user_id, name=name, sum=sum, type=type, date=message.text)
-        else:
-            db.add_incomes(user_id=user_id, name=name, sum=sum, type=type, date=message.text)
+        db.add_money_transfer(user_id=user_id, sum=sum, type=type, date=message.text, ex_in=ex_in)
         key = types.InlineKeyboardMarkup()
         but_1 = types.InlineKeyboardButton(text="Траты", callback_data="expenses")
         but_2 = types.InlineKeyboardButton(text="Поступления", callback_data="incomes")
@@ -108,7 +105,6 @@ def callback_query(call):
 
             bot.register_next_step_handler(mesg,
                                            lambda m: add_expenses_or_incomes_menu(message=m, user_id=call.from_user.id,
-                                                                                  name="",
                                                                                   type=call.data[len("expenses_"):],
                                                                                   ex_in="ex"))
 
@@ -129,7 +125,6 @@ def callback_query(call):
             mesg = bot.send_message(call.message.chat.id, "Введите сумму")
             bot.register_next_step_handler(mesg,
                                            lambda m: add_expenses_or_incomes_menu(message=m, user_id=call.from_user.id,
-                                                                                  name="",
                                                                                   type=call.data[len("incomes_"):],
                                                                                   ex_in="in"))
 
