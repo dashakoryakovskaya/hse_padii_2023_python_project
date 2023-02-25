@@ -49,7 +49,7 @@ def init_db(conn, flag_drop: bool = False):
         user_id INTEGER NOT NULL,
         date DATE,
         sum INTEGER,
-        type TEXT
+        type INTEGER
         );''')
 
     c.execute('''
@@ -58,7 +58,7 @@ def init_db(conn, flag_drop: bool = False):
         user_id INTEGER NOT NULL,
         date DATE,
         sum INTEGER,
-        type TEXT
+        type INTEGER
         );''')
 
     c.execute('''
@@ -83,6 +83,14 @@ def init_db(conn, flag_drop: bool = False):
         num INTEGER,
         name TEXT 
         );''')
+
+    # c.execute('''
+    #     CREATE TABLE IF NOT EXISTS reminders (
+    #     id INTEGER PRIMARY KEY,
+    #     user_id INTEGER,
+    #     name TEXT,
+    #     date DATE
+    #     );''')
 
     conn.commit()
 
@@ -113,41 +121,36 @@ def add_user(conn, user_id: int, name: str):
 
 
 @ensure_connection
-def add_expenses(conn, user_id: int, name: str, sum: int, type: str, date: str):
+def add_money_transfer(conn, user_id: int, name: str, sum: int, type: int, date: str, ex_in: str):
     # conn = get_connection()
     c = conn.cursor()
     # пока один пользователь - добавляем его при start
     # c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;', (user_id, name))
-    c.execute('INSERT INTO expenses (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
-    c.execute(f'UPDATE balance SET total = (SELECT total FROM balance WHERE user_id={user_id}) - {sum} WHERE user_id={user_id};')
-    conn.commit()
+    if ex_in == 'ex':
+        c.execute('INSERT INTO expenses (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
+        c.execute(f'UPDATE balance SET total = (SELECT total FROM balance WHERE user_id={user_id}) - {sum} WHERE user_id={user_id};')
+        conn.commit()
+    else:
+        c.execute('INSERT INTO incomes (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
+        c.execute(
+            f'UPDATE balance SET total = {sum} + (SELECT total FROM balance WHERE user_id={user_id}) WHERE user_id={user_id};')
+        conn.commit()
 
 
 @ensure_connection
-def add_incomes(conn, user_id: int, name: str, sum: int, type: str, date: str):
-    # conn = get_connection()
-    c = conn.cursor()
-    # пока один пользователь - добавляем его при start
-    # c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;', (user_id, name))
-    c.execute('INSERT INTO incomes (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
-    c.execute(f'UPDATE balance SET total = {sum} + (SELECT total FROM balance WHERE user_id={user_id}) WHERE user_id={user_id};')
-    conn.commit()
-
-
-@ensure_connection
-def add_category(conn, user_id: int, type: str, ex_in: str):
+def add_category(conn, user_id: int, type_name: str, ex_in: str):
     # conn = get_connection()
     c = conn.cursor()
     if ex_in == 'ex':
         c.execute(f'SELECT MAX(num) FROM expenses_categories WHERE user_id={user_id};')
         last_record = c.fetchall()[0][0]
         c.execute('INSERT INTO expenses_categories (user_id, num, name) VALUES (?, ?, ?);',
-                  (user_id, last_record + 1, type))
+                  (user_id, last_record + 1, type_name))
     else:
         c.execute(f'SELECT MAX(num) FROM incomes_categories WHERE user_id={user_id};')
         last_record = c.fetchall()[0][0]
         c.execute('INSERT INTO incomes_categories (user_id, num, name) VALUES (?, ?, ?);',
-                  (user_id, last_record + 1, type))
+                  (user_id, last_record + 1, type_name))
     conn.commit()
 
 
@@ -158,6 +161,23 @@ def get_balance(conn, user_id: int):
     c.execute(f'SELECT total FROM balance WHERE user_id={user_id};')
     res = c.fetchall()
     return res
+
+@ensure_connection
+def get_categories(conn, user_id: int, ex_in: str):
+    # conn = get_connection()
+    c = conn.cursor()
+    if ex_in == 'ex':
+        c.execute(f'SELECT num, name FROM expenses_categories WHERE user_id={user_id};')
+        res1 = c.fetchall()
+        c.execute(f'SELECT name, num FROM expenses_categories WHERE user_id={user_id};')
+        res2 = c.fetchall()
+        return (len(res1), dict(res1), dict(res2))
+    else:
+        c.execute(f'SELECT num, name FROM incomes_categories WHERE user_id={user_id};')
+        res1 = c.fetchall()
+        c.execute(f'SELECT name, num FROM incomes_categories WHERE user_id={user_id};')
+        res2 = c.fetchall()
+        return (len(res1), dict(res1), dict(res2))
 
 @ensure_connection
 def sql_execute(conn, sql: str):
