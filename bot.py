@@ -42,12 +42,24 @@ def stop(message):
     bot.stop_polling()
 
 
-def add_expenses_or_incomes_menu(message, user_id, name, type, date, ex_in):
+def add_expenses_or_incomes_menu(message, user_id, name, type, ex_in):
     if message.text.isdigit() and int(message.text) >= 0:
+        mesg = bot.send_message(message.chat.id, "Введите дату в формате YYYY-MM-DD:")
+        bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, name=name, type=type,
+                                                                sum=int(message.text), ex_in=ex_in))
+    else:
+        mesg = bot.send_message(message.chat.id, "Неправильный формат :(\nВведите еще раз:")
+        bot.register_next_step_handler(mesg,
+                                       lambda m: add_expenses_or_incomes_menu(message=m, user_id=user_id, name=name,
+                                                                              type=type, ex_in=ex_in))
+
+
+def add_date(message, user_id, name, type, sum, ex_in):
+    if len(message.text) == 10:
         if ex_in == "ex":
-            db.add_expenses(user_id=user_id, name=name, sum=int(message.text), type=type, date=date)
+            db.add_expenses(user_id=user_id, name=name, sum=sum, type=type, date=message.text)
         else:
-            db.add_incomes(user_id=user_id, name=name, sum=int(message.text), type=type, date=date)
+            db.add_incomes(user_id=user_id, name=name, sum=sum, type=type, date=message.text)
         key = types.InlineKeyboardMarkup()
         but_1 = types.InlineKeyboardButton(text="Траты", callback_data="expenses")
         but_2 = types.InlineKeyboardButton(text="Поступления", callback_data="incomes")
@@ -57,11 +69,8 @@ def add_expenses_or_incomes_menu(message, user_id, name, type, date, ex_in):
         bot.send_message(message.chat.id, text="Меню", reply_markup=key)
     else:
         mesg = bot.send_message(message.chat.id, "Неправильный формат :(\nВведите еще раз:")
-        bot.register_next_step_handler(mesg,
-                                       lambda m: add_expenses_or_incomes_menu(message=m, user_id=user_id,
-                                                                              name=name,
-                                                                              type=type,
-                                                                              date=date, ex_in=ex_in))
+        bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, name=name, type=type,
+                                                                sum=sum, ex_in=ex_in))
 
 
 # TODO: даты в расходах и доходах (пока что дата сообщения)!
@@ -95,7 +104,7 @@ def callback_query(call):
                                            lambda m: add_expenses_or_incomes_menu(message=m, user_id=call.from_user.id,
                                                                                   name="",
                                                                                   type=call.data[len("expenses_"):],
-                                                                                  date=mesg.date, ex_in="ex"))
+                                                                                  ex_in="ex"))
 
         if call.data == "incomes":
             key = types.InlineKeyboardMarkup()
@@ -111,11 +120,10 @@ def callback_query(call):
             bot.answer_callback_query(call.id, "Ведите сумму")
             mesg = bot.send_message(call.message.chat.id, "Введите сумму")
             bot.register_next_step_handler(mesg,
-                                           lambda m: add_expenses_or_incomes_menu(message=m,
-                                                                                  user_id=call.from_user.id,
+                                           lambda m: add_expenses_or_incomes_menu(message=m, user_id=call.from_user.id,
                                                                                   name="",
                                                                                   type=call.data[len("incomes_"):],
-                                                                                  date=mesg.date, ex_in="in"))
+                                                                                  ex_in="in"))
 
         if call.data == "data":
             key = types.InlineKeyboardMarkup()
