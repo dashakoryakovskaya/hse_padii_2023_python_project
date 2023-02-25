@@ -35,14 +35,13 @@ def init_db(conn, flag_drop: bool = False):
         c.execute('DROP TABLE IF EXISTS expenses_categories')
         c.execute('DROP TABLE IF EXISTS reminders')
 
-
     c.execute('''
         CREATE TABLE IF NOT EXISTS user (
         id INTEGER PRIMARY KEY, 
         user_id INTEGER NOT NULL UNIQUE,
         name TEXT
         );'''
-    )
+              )
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS expenses (
@@ -95,18 +94,18 @@ def init_db(conn, flag_drop: bool = False):
 
     conn.commit()
 
+
 def add_default_categories(conn, user_id: int):
     # conn = get_connection()
     c = conn.cursor()
 
     for i in range(len(in_default_categories)):
         c.execute('INSERT INTO incomes_categories (user_id, num, name) VALUES (?, ?, ?);',
-                  (user_id,  i + 1, in_default_categories[i]))
+                  (user_id, i + 1, in_default_categories[i]))
 
     for i in range(len(ex_default_categories)):
         c.execute('INSERT INTO expenses_categories (user_id, num, name) VALUES (?, ?, ?);',
-                  (user_id,  i + 1, ex_default_categories[i]))
-
+                  (user_id, i + 1, ex_default_categories[i]))
 
 
 @ensure_connection
@@ -129,7 +128,8 @@ def add_money_transfer(conn, user_id: int, sum: int, type: int, date: str, ex_in
     # c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;', (user_id, name))
     if ex_in == 'ex':
         c.execute('INSERT INTO expenses (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
-        c.execute(f'UPDATE balance SET total = (SELECT total FROM balance WHERE user_id={user_id}) - {sum} WHERE user_id={user_id};')
+        c.execute(
+            f'UPDATE balance SET total = (SELECT total FROM balance WHERE user_id={user_id}) - {sum} WHERE user_id={user_id};')
         conn.commit()
     else:
         c.execute('INSERT INTO incomes (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
@@ -163,6 +163,7 @@ def get_balance(conn, user_id: int):
     res = c.fetchall()
     return res
 
+
 @ensure_connection
 def get_categories(conn, user_id: int, ex_in: str):
     # conn = get_connection()
@@ -180,13 +181,15 @@ def get_categories(conn, user_id: int, ex_in: str):
         res2 = c.fetchall()
         return (len(res1), dict(res1), dict(res2))
 
+
 @ensure_connection
 def add_reminder(conn, user_id: int, name: str, date: str):
     # conn = get_connection()
     c = conn.cursor()
     c.execute('INSERT INTO reminders (user_id, name, date) VALUES (?, ?, ?);',
-                  (user_id, name, date))
+              (user_id, name, date))
     conn.commit()
+
 
 @ensure_connection
 def sql_execute(conn, sql: str):
