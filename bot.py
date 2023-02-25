@@ -78,7 +78,7 @@ def add_date(message, user_id, type, sum, ex_in):
         # datetime.utcfromtimestamp(message.date).strftime('%Y-%m-%d')
         db.add_money_transfer(user_id=user_id, sum=sum, type=type,
                               date=tconv(message.date), ex_in=ex_in)
-        bot.send_message(message.chat.id, text="Записано!")
+        bot.send_message(message.chat.id, text="Записано!", reply_markup=types.ReplyKeyboardRemove())
         bot.send_message(message.chat.id, text="Меню", reply_markup=menu_key())
         return
     # TODO: проверять длину месяца (апрель - 30 и тд)
@@ -91,7 +91,7 @@ def add_date(message, user_id, type, sum, ex_in):
                                                                 sum=sum, ex_in=ex_in))
     else:
         db.add_money_transfer(user_id=user_id, sum=sum, type=type, date=message.text, ex_in=ex_in)
-        bot.send_message(message.chat.id, text="Записано!")
+        bot.send_message(message.chat.id, text="Записано!", reply_markup=types.ReplyKeyboardRemove())
         bot.send_message(message.chat.id, text="Меню", reply_markup=menu_key())
 
 
