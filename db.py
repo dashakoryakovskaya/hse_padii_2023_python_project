@@ -33,6 +33,7 @@ def init_db(conn, flag_drop: bool = False):
         c.execute('DROP TABLE IF EXISTS balance')
         c.execute('DROP TABLE IF EXISTS incomes_categories')
         c.execute('DROP TABLE IF EXISTS expenses_categories')
+        c.execute('DROP TABLE IF EXISTS reminders')
 
 
     c.execute('''
@@ -84,13 +85,13 @@ def init_db(conn, flag_drop: bool = False):
         name TEXT 
         );''')
 
-    # c.execute('''
-    #     CREATE TABLE IF NOT EXISTS reminders (
-    #     id INTEGER PRIMARY KEY,
-    #     user_id INTEGER,
-    #     name TEXT,
-    #     date DATE
-    #     );''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS reminders (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER,
+        name TEXT,
+        date DATE
+        );''')
 
     conn.commit()
 
@@ -121,7 +122,7 @@ def add_user(conn, user_id: int, name: str):
 
 
 @ensure_connection
-def add_money_transfer(conn, user_id: int, name: str, sum: int, type: int, date: str, ex_in: str):
+def add_money_transfer(conn, user_id: int, sum: int, type: int, date: str, ex_in: str):
     # conn = get_connection()
     c = conn.cursor()
     # пока один пользователь - добавляем его при start
@@ -178,6 +179,14 @@ def get_categories(conn, user_id: int, ex_in: str):
         c.execute(f'SELECT name, num FROM incomes_categories WHERE user_id={user_id};')
         res2 = c.fetchall()
         return (len(res1), dict(res1), dict(res2))
+
+@ensure_connection
+def add_reminder(conn, user_id: int, name: str, date: str):
+    # conn = get_connection()
+    c = conn.cursor()
+    c.execute('INSERT INTO reminders (user_id, name, date) VALUES (?, ?, ?);',
+                  (user_id, name, date))
+    conn.commit()
 
 @ensure_connection
 def sql_execute(conn, sql: str):

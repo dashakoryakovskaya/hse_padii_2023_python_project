@@ -34,10 +34,10 @@ def repeat_all_messages(message):
     # bot.send_message(message.chat.id, str(threading.current_thread().ident))
     # TODO: сделать это все через меню / кнопки, категории!!
     if message.text[0] == '+':
-        db.add_money_transfer(user_id=message.from_user.id, name=message.from_user.username, date=message.date,
+        db.add_money_transfer(user_id=message.from_user.id, date=message.date,
                        sum=int(message.text[1:]), type='', ex_in='in')
     if message.text[0] == '-':
-        db.add_money_transfer(user_id=message.from_user.id, name=message.from_user.username, date=message.date,
+        db.add_money_transfer(user_id=message.from_user.id, date=message.date,
                         sum=int(message.text[1:]), type='', ex_in='ex')
     # вся информация из таблицы по запросу имятаблицы_data
     if message.text[-4:] == 'data':
@@ -54,6 +54,10 @@ def repeat_all_messages(message):
     if message.text == 'check cat':
         res = db.get_categories(user_id=message.from_user.id, ex_in='ex')
         bot.send_message(message.chat.id, str(res[0]))
+
+    if message.text == 'add reminder':
+        db.add_reminder(user_id=message.from_user.id, name='subs', date=db.get_date_from_int(message.date))
+
 
 
 def main():
