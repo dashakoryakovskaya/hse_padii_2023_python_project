@@ -54,14 +54,14 @@ def add_expenses_or_incomes_menu(message, user_id, type, ex_in):
                                                                               type=type, ex_in=ex_in))
 
 
-def add_date(message, user_id, name, type, sum, ex_in):
+def add_date(message, user_id, type, sum, ex_in):
     # TODO: проверять длину месяца (апрель - 30 и тд)
     if len(message.text) != 10 or message.text[4] != "-" or message.text[7] != "-" or not message.text[0:4].isdigit() \
             or not message.text[5:7].isdigit() or not message.text[8:10].isdigit() \
             or (12 < int(message.text[5:7]) or int(message.text[5:7]) < 1) \
             or (31 < int(message.text[8:10]) or int(message.text[8:10]) < 1):
         mesg = bot.send_message(message.chat.id, "Неправильный формат YYYY-MM-DD :(\nВведите еще раз:")
-        bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, name=name, type=type,
+        bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, type=type,
                                                                 sum=sum, ex_in=ex_in))
     else:
         db.add_money_transfer(user_id=user_id, sum=sum, type=type, date=message.text, ex_in=ex_in)
