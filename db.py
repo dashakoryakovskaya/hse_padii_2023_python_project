@@ -96,7 +96,7 @@ def init_db(conn, flag_drop: bool = False):
     conn.commit()
 
 
-@ensure_connection
+
 def add_default_categories(conn, user_id: int):
     # conn = get_connection()
     c = conn.cursor()

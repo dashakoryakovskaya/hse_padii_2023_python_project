@@ -90,11 +90,15 @@ def callback_query(call):
         if call.data == "expenses":
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
-            but_1 = types.InlineKeyboardButton(text="Еда", callback_data="expenses_food")
+            cat_dict = db.get_categories(user_id=call.from_user.id, ex_in="ex")[2]
+            for key_d in cat_dict.keys():
+                key.add(types.InlineKeyboardButton(text=key_d, callback_data="expenses_"+str(cat_dict[key_d])))
+            '''but_1 = types.InlineKeyboardButton(text="Еда", callback_data="expenses_food")
             but_2 = types.InlineKeyboardButton(text="Жилье", callback_data="expenses_house")
             but_3 = types.InlineKeyboardButton(text="Развлечения", callback_data="expenses_entertainment")
             but_4 = types.InlineKeyboardButton(text="Меню", callback_data="menu")
-            key.add(but_1, but_2, but_3, but_4)
+            key.add(but_1, but_2, but_3, but_4)'''
+            key.add(types.InlineKeyboardButton(text="Меню", callback_data="menu"))
             # bot.send_message(chat_id=call.message.chat.id, text="Выберите категорию:", reply_markup=key)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="Выберите категорию:", reply_markup=key)
@@ -111,10 +115,14 @@ def callback_query(call):
         if call.data == "incomes":
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
-            but_1 = types.InlineKeyboardButton(text="Зарплата", callback_data="incomes_salary")
+            cat_dict = db.get_categories(user_id=call.from_user.id, ex_in="in")[2]
+            for key_d in cat_dict.keys():
+                key.add(types.InlineKeyboardButton(text=key_d, callback_data="incomes_" + str(cat_dict[key_d])))
+            '''but_1 = types.InlineKeyboardButton(text="Зарплата", callback_data="incomes_salary")
             but_2 = types.InlineKeyboardButton(text="Подарок", callback_data="incomes_gift")
             but_3 = types.InlineKeyboardButton(text="Меню", callback_data="menu")
-            key.add(but_1, but_2, but_3)
+            key.add(but_1, but_2, but_3)'''
+            key.add(types.InlineKeyboardButton(text="Меню", callback_data="menu"))
             # bot.send_message(chat_id=call.message.chat.id, text="Выберите категорию:", reply_markup=key)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="Выберите категорию:", reply_markup=key)
