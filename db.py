@@ -5,6 +5,7 @@ __connection = None
 ex_default_categories = ['food', 'house', 'entertainment']
 in_default_categories = ['salary', 'gift']
 
+
 def ensure_connection(func):
     def inner(*args, **kwargs):
         with sqlite3.connect('user.db') as conn:
@@ -93,6 +94,7 @@ def init_db(conn, flag_drop: bool = False):
         );''')
 
     conn.commit()
+
 
 
 def add_default_categories(conn, user_id: int):
