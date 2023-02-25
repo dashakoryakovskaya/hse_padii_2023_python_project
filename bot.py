@@ -48,18 +48,19 @@ def add_expenses_or_incomes_menu(message, user_id, name, type, ex_in):
         bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, name=name, type=type,
                                                                 sum=int(message.text), ex_in=ex_in))
     else:
-        mesg = bot.send_message(message.chat.id, "Неправильный формат :(\nВведите еще раз:")
+        mesg = bot.send_message(message.chat.id, "Неправильный формат суммы :(\nВведите еще раз:")
         bot.register_next_step_handler(mesg,
                                        lambda m: add_expenses_or_incomes_menu(message=m, user_id=user_id, name=name,
                                                                               type=type, ex_in=ex_in))
 
 
 def add_date(message, user_id, name, type, sum, ex_in):
+    # TODO: проверять длину месяца (апрель - 30 и тд)
     if len(message.text) != 10 or message.text[4] != "-" or message.text[7] != "-" or not message.text[0:4].isdigit() \
             or not message.text[5:7].isdigit() or not message.text[8:10].isdigit() \
             or (12 < int(message.text[5:7]) or int(message.text[5:7]) < 1) \
             or (31 < int(message.text[8:10]) or int(message.text[8:10]) < 1):
-        mesg = bot.send_message(message.chat.id, "Неправильный формат :(\nВведите еще раз:")
+        mesg = bot.send_message(message.chat.id, "Неправильный формат YYYY-MM-DD :(\nВведите еще раз:")
         bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, name=name, type=type,
                                                                 sum=sum, ex_in=ex_in))
     else:
@@ -80,6 +81,7 @@ def add_date(message, user_id, name, type, sum, ex_in):
 def callback_query(call):
     if call.message:
         if call.data == "menu":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="Траты", callback_data="expenses")
             but_2 = types.InlineKeyboardButton(text="Поступления", callback_data="incomes")
@@ -89,6 +91,7 @@ def callback_query(call):
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Меню",
                                   reply_markup=key)
         if call.data == "expenses":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="Еда", callback_data="expenses_food")
             but_2 = types.InlineKeyboardButton(text="Жилье", callback_data="expenses_house")
@@ -99,6 +102,7 @@ def callback_query(call):
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="Выберите категорию:", reply_markup=key)
         if call.data[:len("expenses_")] == "expenses_":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             bot.answer_callback_query(call.id, "Ведите сумму")
             mesg = bot.send_message(call.message.chat.id, "Введите сумму")
 
@@ -109,6 +113,7 @@ def callback_query(call):
                                                                                   ex_in="ex"))
 
         if call.data == "incomes":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="Зарплата", callback_data="incomes_salary")
             but_2 = types.InlineKeyboardButton(text="Подарок", callback_data="incomes_gift")
@@ -119,6 +124,7 @@ def callback_query(call):
                                   text="Выберите категорию:", reply_markup=key)
 
         if call.data[:len("incomes_")] == "incomes_":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             bot.answer_callback_query(call.id, "Ведите сумму")
             mesg = bot.send_message(call.message.chat.id, "Введите сумму")
             bot.register_next_step_handler(mesg,
@@ -128,6 +134,8 @@ def callback_query(call):
                                                                                   ex_in="in"))
 
         if call.data == "data":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
+            # TODO: Продумать статистику для доходов и расходов (период, категории и тд)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="Баланс", callback_data="data_balance")
             but_2 = types.InlineKeyboardButton(text="Расходы", callback_data="data_expenses")
@@ -139,6 +147,7 @@ def callback_query(call):
                                   text="Выберите категорию:", reply_markup=key)
 
         if call.data == "data_balance":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             bot.send_message(call.message.chat.id, 'balance' + ':\n' + one_tuple_to_str(
                 db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={call.from_user.id};")))
 
