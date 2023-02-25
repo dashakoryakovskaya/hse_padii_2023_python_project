@@ -46,7 +46,10 @@ def repeat_all_messages(message):
                                                                                                           message.text[
                                                                                                           :-5])))
     if message.text == 'check balance':
-        bot.send_message(message.chat.id, 'balance' + ':\n' + one_tuple_to_str(db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={message.from_user.id};")))
+        bot.send_message(message.chat.id, 'balance' + ':\n' + one_tuple_to_str(db.get_balance(user_id=message.chat.id)))
+
+    if message.text == 'add cat':
+        db.add_category(user_id=message.from_user.id, type='smth', ex_in='ex')
 
 
 def main():
