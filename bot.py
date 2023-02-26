@@ -28,8 +28,7 @@ def menu_key():
     but_1 = types.InlineKeyboardButton(text="Траты", callback_data="expenses")
     but_2 = types.InlineKeyboardButton(text="Поступления", callback_data="incomes")
     but_3 = types.InlineKeyboardButton(text="Статистика", callback_data="data")
-    but_4 = types.InlineKeyboardButton(text="Добавить категории", callback_data="add_category")
-    key.add(but_1, but_2, but_3, but_4)
+    key.add(but_1, but_2, but_3)
     return key
 
 
@@ -64,13 +63,6 @@ def add_expenses_or_incomes_menu(message, user_id, type, ex_in):
         bot.register_next_step_handler(mesg,
                                        lambda m: add_expenses_or_incomes_menu(message=m, user_id=user_id,
                                                                               type=type, ex_in=ex_in))
-
-
-def add_cat(message, user_id, type_name, ex_in):
-    # TODO: нужно ли проверить как-то под формат?
-    db.add_category(user_id=user_id, type_name=type_name, ex_in=ex_in)
-    bot.send_message(message.chat.id, text="Записано!")
-    bot.send_message(message.chat.id, text="Меню", reply_markup=menu_key())
 
 
 def add_date(message, user_id, type, sum, ex_in):
@@ -151,24 +143,6 @@ def callback_query(call):
                                            lambda m: add_expenses_or_incomes_menu(message=m, user_id=call.from_user.id,
                                                                                   type=call.data[len("incomes_"):],
                                                                                   ex_in="in"))
-
-        if call.data == "add_category":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
-            key = types.InlineKeyboardMarkup()
-            but_1 = types.InlineKeyboardButton(text="Траты", callback_data="add_cat_ex")
-            but_2 = types.InlineKeyboardButton(text="Поступления", callback_data="add_cat_in")
-            but_3 = types.InlineKeyboardButton(text="Меню", callback_data="menu")
-            key.add(but_1, but_2, but_3)
-            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                  text="Выберите тип категории:", reply_markup=key)
-
-        if call.data[:len("add_cat_")] == "add_cat_":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
-            # bot.answer_callback_query(call.id, "Введите категорию")
-            mesg = bot.send_message(call.message.chat.id, "Введите категорию")
-            bot.register_next_step_handler(mesg,
-                                           lambda m: add_cat(message=m, user_id=call.from_user.id, type_name=m.text,
-                                                             ex_in=call.data[len("add_cat_"):], ))
 
         if call.data == "data":
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
