@@ -2,8 +2,9 @@ import sqlite3
 
 __connection = None
 
-ex_default_categories = ['food', 'house', 'entertainment']
-in_default_categories = ['salary', 'gift']
+ex_default_categories = {'Развлечения': 1, 'Автомобиль': 2, 'Дом': 3, 'Здоровье': 4, 'Одежда' : 5, 'Питание': 6, 'Подарки': 7, 'Семейные расходы': 8, 'Услуги': 9, 'Другое': 10}
+in_default_categories = {'Зарплата': 1, 'Подарок': 2, 'Инвестиции': 3, 'Другое': 4}
+
 
 
 def ensure_connection(func):
@@ -32,8 +33,8 @@ def init_db(conn, flag_drop: bool = False):
         c.execute('DROP TABLE IF EXISTS expenses')
         c.execute('DROP TABLE IF EXISTS incomes')
         c.execute('DROP TABLE IF EXISTS balance')
-        c.execute('DROP TABLE IF EXISTS incomes_categories')
-        c.execute('DROP TABLE IF EXISTS expenses_categories')
+        # c.execute('DROP TABLE IF EXISTS incomes_categories')
+        # c.execute('DROP TABLE IF EXISTS expenses_categories')
         c.execute('DROP TABLE IF EXISTS reminders')
 
     c.execute('''
@@ -69,21 +70,21 @@ def init_db(conn, flag_drop: bool = False):
         total BIGINT
         );''')
 
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS incomes_categories (
-        id INTEGER PRIMARY KEY, 
-        user_id INTEGER,
-        num INTEGER,
-        name TEXT
-        );''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS expenses_categories (
-        id INTEGER PRIMARY KEY, 
-        user_id INTEGER,
-        num INTEGER,
-        name TEXT 
-        );''')
+    # c.execute('''
+    #     CREATE TABLE IF NOT EXISTS incomes_categories (
+    #     id INTEGER PRIMARY KEY,
+    #     user_id INTEGER,
+    #     num INTEGER,
+    #     name TEXT
+    #     );''')
+    #
+    # c.execute('''
+    #     CREATE TABLE IF NOT EXISTS expenses_categories (
+    #     id INTEGER PRIMARY KEY,
+    #     user_id INTEGER,
+    #     num INTEGER,
+    #     name TEXT
+    #     );''')
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS reminders (
@@ -118,7 +119,7 @@ def add_user(conn, user_id: int, name: str):
               (user_id, name))
     c.execute('INSERT INTO balance (user_id, total) VALUES (?, ?);',
               (user_id, 0))
-    add_default_categories(conn, user_id)
+    # add_default_categories(conn, user_id)
     conn.commit()
 
 
@@ -165,8 +166,30 @@ def get_balance(conn, user_id: int):
     res = c.fetchall()
     return res
 
-
 @ensure_connection
+def get_statistics(conn, user_id: int, type: int, ex_in: str, all_period=False, data_start='', data_end=''):
+    # conn = get_connection()
+    c = conn.cursor()
+    if (ex_in == 'ex'):
+        if all_period:
+            c.execute(f'SELECT SUM(sum) FROM expenses WHERE user_id={user_id} AND type={type};')
+            res = c.fetchall()[0][0]
+            return res
+        else:
+            c.execute(f'SELECT SUM(sum) FROM expenses WHERE user_id={user_id} AND type={type} AND date BETWEEN {data_start} AND {data_end};')
+            res = c.fetchall()[0][0]
+            return res
+    else:
+        if all_period:
+            c.execute(f'SELECT SUM(sum) FROM incomes WHERE user_id={user_id} AND type={type};')
+            res = c.fetchall()[0][0]
+            return res
+        else:
+            c.execute(f'SELECT SUM(sum) FROM incomes WHERE user_id={user_id} AND type={type} AND date BETWEEN {data_start} AND {data_end};')
+            res = c.fetchall()[0][0]
+            return res
+
+'''@ensure_connection
 def get_categories(conn, user_id: int, ex_in: str):
     # conn = get_connection()
     c = conn.cursor()
@@ -181,8 +204,14 @@ def get_categories(conn, user_id: int, ex_in: str):
         res1 = c.fetchall()
         c.execute(f'SELECT name, num FROM incomes_categories WHERE user_id={user_id};')
         res2 = c.fetchall()
-        return (len(res1), dict(res1), dict(res2))
+        return (len(res1), dict(res1), dict(res2))'''
 
+
+def get_categories(ex_in: str):
+    if ex_in == 'ex':
+        return ex_default_categories
+    else:
+        return in_default_categories
 
 @ensure_connection
 def add_reminder(conn, user_id: int, name: str, date: str):

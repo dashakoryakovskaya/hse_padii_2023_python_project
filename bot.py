@@ -35,7 +35,7 @@ def menu_key():
 
 def category_key(user_id, ex_in, callback):
     key = types.InlineKeyboardMarkup()
-    cat_dict = db.get_categories(user_id=user_id, ex_in=ex_in)[2]
+    cat_dict = db.get_categories(ex_in=ex_in)
     for key_d in cat_dict.keys():
         key.add(types.InlineKeyboardButton(text=key_d, callback_data=callback + str(cat_dict[key_d])))
     key.add(types.InlineKeyboardButton(text="Меню", callback_data="menu"))
@@ -105,8 +105,8 @@ def add_date(message, user_id, type, sum, ex_in):
 
 def get_data_period(message, user_id, type, ex_in):
     if message.text == "Весь период":
-        # db.f(user_id=user_id, type=type, ex_in=ex_in, all_period=True)
-        bot.send_message(message.chat.id, text="Статистика:", reply_markup=types.ReplyKeyboardRemove())
+        sum = db.get_statistics(user_id=user_id, type=type, ex_in=ex_in, all_period=True)
+        bot.send_message(message.chat.id, text="Статистика:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
         bot.send_message(message.chat.id, text="Меню", reply_markup=menu_key())
         return
     if len(message.text) != 21 or is_incorrect_date_format(message.text[:10]) or is_incorrect_date_format(
@@ -115,8 +115,8 @@ def get_data_period(message, user_id, type, ex_in):
         bot.register_next_step_handler(mesg,
                                        lambda m: get_data_period(message=m, user_id=user_id, type=type, ex_in=ex_in))
     else:
-        # db.f(user_id=user_id, type=type, ex_in=ex_in, all_period=False, data_start=message.text[:10], data_end=message.text[11:])
-        bot.send_message(message.chat.id, text="Статистика:", reply_markup=types.ReplyKeyboardRemove())
+        sum = db.get_statistics(user_id=user_id, type=type, ex_in=ex_in, all_period=False, data_start=message.text[:10], data_end=message.text[11:])
+        bot.send_message(message.chat.id, text="Статистика:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
         bot.send_message(message.chat.id, text="Меню", reply_markup=menu_key())
 
 
