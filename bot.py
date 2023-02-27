@@ -34,7 +34,7 @@ def menu_key():
 
 
 def category_key(user_id, ex_in, callback):
-    key = types.InlineKeyboardMarkup()
+    key = types.InlineKeyboardMarkup(row_width=2)
     cat_dict = db.get_categories(ex_in=ex_in)
     for key_d in cat_dict.keys():
         key.add(types.InlineKeyboardButton(text=key_d, callback_data=callback + str(cat_dict[key_d])))
@@ -227,5 +227,5 @@ def main():
 
 if __name__ == '__main__':
     # TODO: нужен ли тут flag_drop=True ?
-    db.init_db()
+    db.init_db(flag_drop=True)
     main()

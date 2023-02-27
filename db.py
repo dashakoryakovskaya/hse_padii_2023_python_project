@@ -190,7 +190,7 @@ def get_sum(conn, user_id: int, type: int, ex_in: str, all_period=False, data_st
     c = conn.cursor()
     c.execute(sql)
     res = c.fetchall()[0][0]
-    return res
+    return 0 if res is None else res
     '''if (ex_in == 'ex'):
         if all_period:
             c.execute(f'SELECT SUM(sum) FROM expenses WHERE user_id={user_id} AND type={type};')
