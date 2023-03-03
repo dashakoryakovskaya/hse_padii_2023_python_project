@@ -10,6 +10,8 @@ ex_default_categories_rev = {1: 'Развлечения', 2: 'Автомобил
 in_default_categories = {'Зарплата': 1, 'Подарок': 2, 'Инвестиции': 3, 'Другое': 4}
 in_default_categories_rev = {1: 'Зарплата', 2: 'Подарок', 3: 'Инвестиции', 4: 'Другое'}
 
+kinds_of_notification = {0: "Ежедневные", 1: "По дате"}
+
 
 def ensure_connection(func):
     def inner(*args, **kwargs):
@@ -94,8 +96,10 @@ def init_db(conn, flag_drop: bool = False):
         CREATE TABLE IF NOT EXISTS reminders (
         id INTEGER PRIMARY KEY,
         user_id INTEGER,
-        name TEXT,
-        date DATE
+        title TEXT,
+        type INTEGER,
+        date DATE,
+        time TIME
         );''')
 
     conn.commit()
@@ -301,12 +305,33 @@ def get_categories(ex_in: str):
 
 
 @ensure_connection
-def add_reminder(conn, user_id: int, name: str, date: str):
+def get_all_user_ids(conn):
+    c = conn.cursor()
+    c.execute('SELECT user_id FROM user')
+    res = c.fetchall()
+    return res
+
+
+@ensure_connection
+def get_all_reminders(conn):
+    c = conn.cursor()
+    c.execute('SELECT user_id, title, type, date, time FROM reminders;')
+    res = c.fetchall()
+    print(res)
+    return res
+
+
+@ensure_connection
+def add_reminder(conn, user_id: int, time: str, date='', title='', type=0):
     # conn = get_connection()
     c = conn.cursor()
-    c.execute('INSERT INTO reminders (user_id, name, date) VALUES (?, ?, ?);',
-              (user_id, name, date))
+    c.execute('INSERT INTO reminders (user_id, title, type, date, time) VALUES (?, ?, ?, ?, ?);',
+              (user_id, title, type, date, time))
     conn.commit()
+
+
+def add_base_reminder(user_id: int, time: str):
+    add_reminder(user_id=user_id, time=time, title='Мечтаю узнать о том, сколько ты сегодня потратил! Ну и получил)))')
 
 
 @ensure_connection
