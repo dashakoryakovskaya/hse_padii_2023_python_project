@@ -133,15 +133,16 @@ def add_money_transfer(conn, user_id: int, sum: int, type: int, date: str, ex_in
     # пока один пользователь - добавляем его при start
     # c.execute('INSERT INTO user (user_id, name) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET name = name;', (user_id, name))
     if ex_in == 'ex':
-        c.execute('INSERT INTO expenses (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
+        ex_in = "expenses"
         c.execute(
             f'UPDATE balance SET total = (SELECT total FROM balance WHERE user_id={user_id}) - {sum} WHERE user_id={user_id};')
-        conn.commit()
     else:
-        c.execute('INSERT INTO incomes (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
+        ex_in = "incomes"
         c.execute(
-            f'UPDATE balance SET total = {sum} + (SELECT total FROM balance WHERE user_id={user_id}) WHERE user_id={user_id};')
-        conn.commit()
+            f'UPDATE balance SET total = (SELECT total FROM balance WHERE user_id={user_id}) + {sum} WHERE user_id={user_id};')
+
+    c.execute(f'INSERT INTO {ex_in} (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
+    conn.commit()
 
 
 @ensure_connection
@@ -149,15 +150,14 @@ def add_category(conn, user_id: int, type_name: str, ex_in: str):
     # conn = get_connection()
     c = conn.cursor()
     if ex_in == 'ex':
-        c.execute(f'SELECT MAX(num) FROM expenses_categories WHERE user_id={user_id};')
-        last_record = c.fetchall()[0][0]
-        c.execute('INSERT INTO expenses_categories (user_id, num, name) VALUES (?, ?, ?);',
-                  (user_id, last_record + 1, type_name))
+        ex_in = "expenses"
     else:
-        c.execute(f'SELECT MAX(num) FROM incomes_categories WHERE user_id={user_id};')
-        last_record = c.fetchall()[0][0]
-        c.execute('INSERT INTO incomes_categories (user_id, num, name) VALUES (?, ?, ?);',
-                  (user_id, last_record + 1, type_name))
+        ex_in = "incomes"
+    c.execute(f'SELECT MAX(num) FROM {ex_in}_categories WHERE user_id={user_id};')
+    last_record = c.fetchall()[0][0]
+    c.execute(f'INSERT INTO {ex_in}_categories (user_id, num, name) VALUES (?, ?, ?);',
+              (user_id, last_record + 1, type_name))
+
     conn.commit()
 
 
@@ -174,24 +174,21 @@ def get_balance(conn, user_id: int):
 def get_sum(conn, user_id: int, type: int, ex_in: str, all_period=False, data_start='', data_end=''):
     # conn = get_connection()
     if ex_in == 'ex':
-        if type == -1:
-            sql = f'SELECT SUM(sum) FROM expenses WHERE user_id={user_id};' if all_period else \
-                f'SELECT SUM(sum) FROM expenses WHERE user_id={user_id} AND date BETWEEN {data_start} AND {data_end};'
-        else:
-            sql = f'SELECT SUM(sum) FROM expenses WHERE user_id={user_id} AND type={type};' if all_period else \
-                f'SELECT SUM(sum) FROM expenses WHERE user_id={user_id} AND type={type} AND date BETWEEN {data_start} AND {data_end};'
+        ex_in = "expenses"
     else:
-        if type == -1:
-            sql = f'SELECT SUM(sum) FROM incomes WHERE user_id={user_id};' if all_period else \
-                f'SELECT SUM(sum) FROM incomes WHERE user_id={user_id} AND date BETWEEN {data_start} AND {data_end};'
-        else:
-            sql = f'SELECT SUM(sum) FROM incomes WHERE user_id={user_id} AND type={type};' if all_period else \
-                f'SELECT SUM(sum) FROM incomes WHERE user_id={user_id} AND type={type} AND date BETWEEN {data_start} AND {data_end};'
+        ex_in = "incomes"
+    if type == -1:
+        sql = f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id};' if all_period else \
+            f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id} AND date BETWEEN {data_start} AND {data_end};'
+    else:
+        sql = f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id} AND type={type};' if all_period else \
+            f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id} AND type={type} AND date BETWEEN {data_start} AND {data_end};'
+
     c = conn.cursor()
     c.execute(sql)
     res = c.fetchall()[0][0]
     return 0 if res is None else res
-    '''if (ex_in == 'ex'):
+'''if (ex_in == 'ex'):
         if all_period:
             c.execute(f'SELECT SUM(sum) FROM expenses WHERE user_id={user_id} AND type={type};')
             res = c.fetchall()[0][0]
@@ -218,24 +215,21 @@ def get_all_statistic(conn, user_id: int, type: int, ex_in: str, all_period=Fals
     # conn = get_connection()
     c = conn.cursor()
     if ex_in == 'ex':
-        if type == -1:
-            sql = f'SELECT sum, date, type FROM expenses WHERE user_id={user_id};' if all_period else \
-                f'SELECT sum, date, type FROM expenses WHERE user_id={user_id} AND date BETWEEN {data_start} AND {data_end};'
-        else:
-            sql = f'SELECT sum, date, type FROM expenses WHERE user_id={user_id} AND type={type};' if all_period else \
-                f'SELECT sum, date, type FROM expenses WHERE user_id={user_id} AND type={type} AND date BETWEEN {data_start} AND {data_end};'
+        ex_in = "expenses"
     else:
-        if type == -1:
-            sql = f'SELECT sum, date, type FROM incomes WHERE user_id={user_id};' if all_period else \
-                f'SELECT sum, date, type FROM incomes WHERE user_id={user_id} AND date BETWEEN {data_start} AND {data_end};'
-        else:
-            sql = f'SELECT sum, date, type FROM incomes WHERE user_id={user_id} AND type={type};' if all_period else \
-                f'SELECT sum, date, type FROM incomes WHERE user_id={user_id} AND type={type} AND date BETWEEN {data_start} AND {data_end};'
+        ex_in = "incomes"
+    if type == -1:
+        sql = f'SELECT sum, date, type FROM {ex_in} WHERE user_id={user_id};' if all_period else \
+            f'SELECT sum, date, type FROM {ex_in} WHERE user_id={user_id} AND date BETWEEN {data_start} AND {data_end};'
+    else:
+        sql = f'SELECT sum, date, type FROM {ex_in} WHERE user_id={user_id} AND type={type};' if all_period else \
+            f'SELECT sum, date, type FROM {ex_in} WHERE user_id={user_id} AND type={type} AND date BETWEEN {data_start} AND {data_end};'
+
 
     c.execute(sql)
     table = from_db_cursor(c)
     table.field_names = ['Сумма', 'Дата', 'Категория']
-    if ex_in == 'ex':
+    if ex_in == 'expenses':
         for i, _ in enumerate(table.rows):
             table.rows[i][2] = ex_default_categories_rev[table.rows[i][2]]
     else:
@@ -243,7 +237,7 @@ def get_all_statistic(conn, user_id: int, type: int, ex_in: str, all_period=Fals
             table.rows[i][2] = in_default_categories_rev[table.rows[i][2]]
     return table
 
-    '''if (ex_in == 'ex'):
+'''if (ex_in == 'ex'):
         if type == -1:
             if all_period:
                 c.execute(f'SELECT sum, date, type FROM expenses WHERE user_id={user_id};')
