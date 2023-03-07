@@ -40,6 +40,7 @@ def init_db(conn, flag_drop: bool = False):
         # c.execute('DROP TABLE IF EXISTS incomes_categories')
         # c.execute('DROP TABLE IF EXISTS expenses_categories')
         c.execute('DROP TABLE IF EXISTS reminders')
+        c.execute('DROP TABLE IF EXISTS cards')
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS user (
@@ -98,6 +99,14 @@ def init_db(conn, flag_drop: bool = False):
         date DATE
         );''')
 
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS cards (
+    id INTEGER PRIMARY KEY, 
+    user_id INTEGER,
+    name TEXT,
+    card BLOB NOT NULL
+    );''')
+
     conn.commit()
 
 
@@ -153,9 +162,9 @@ def add_category(conn, user_id: int, type_name: str, ex_in: str):
         ex_in = "expenses"
     else:
         ex_in = "incomes"
-    c.execute(f'SELECT MAX(num) FROM {ex_in}_categories WHERE user_id={user_id};')
+    c.execute(f'SELECT MAX(num) FROM {ex_in} categories WHERE user_id={user_id};')
     last_record = c.fetchall()[0][0]
-    c.execute(f'INSERT INTO {ex_in}_categories (user_id, num, name) VALUES (?, ?, ?);',
+    c.execute(f'INSERT INTO {ex_in} categories (user_id, num, name) VALUES (?, ?, ?);',
               (user_id, last_record + 1, type_name))
 
     conn.commit()
@@ -307,6 +316,24 @@ def add_reminder(conn, user_id: int, name: str, date: str):
     c.execute('INSERT INTO reminders (user_id, name, date) VALUES (?, ?, ?);',
               (user_id, name, date))
     conn.commit()
+
+
+@ensure_connection
+def add_card(conn, user_id: int, name: str, card):
+    # conn = get_connection()
+    c = conn.cursor()
+    c.execute('INSERT INTO cards (user_id, name, card) VALUES (?, ?, ?);',
+              (user_id, name, card))
+    conn.commit()
+
+
+@ensure_connection
+def get_cards(conn, user_id: int):
+    # conn = get_connection()
+    c = conn.cursor()
+    c.execute(f'SELECT name, card FROM cards WHERE user_id={user_id};')
+    res = c.fetchall()
+    return res
 
 
 @ensure_connection
