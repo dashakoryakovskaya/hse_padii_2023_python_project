@@ -32,7 +32,7 @@ def menu_key():
     but_1 = types.InlineKeyboardButton(text="📉 Расходы", callback_data="ex")
     but_2 = types.InlineKeyboardButton(text="📈 Доходы", callback_data="in")
     but_3 = types.InlineKeyboardButton(text="📃 Статистика", callback_data="data")
-    but_4 = types.InlineKeyboardButton(text="Дисконтные карты", callback_data="cards")
+    but_4 = types.InlineKeyboardButton(text="✔️ Дисконтные карты", callback_data="cards")
     key.add(but_1, but_2, but_3, but_4)
     return key
 
@@ -194,6 +194,7 @@ def callback_query(call):
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             bot.send_message(call.message.chat.id, 'Баланс:' + '\n' + one_tuple_to_str(
                 db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={call.from_user.id};")))
+            bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
         if call.data == "data_ex" or call.data == "data_in":
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
@@ -239,8 +240,8 @@ def callback_query(call):
         if call.data == "cards":
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
-            but_1 = types.InlineKeyboardButton(text="Получить карту", callback_data="cards_get")
-            but_2 = types.InlineKeyboardButton(text="Добавить карту", callback_data="cards_add")
+            but_1 = types.InlineKeyboardButton(text="📃 Получить карту", callback_data="cards_get")
+            but_2 = types.InlineKeyboardButton(text="✅ Добавить карту", callback_data="cards_add")
             but_3 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
             key.add(but_1, but_2, but_3)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
@@ -271,6 +272,7 @@ def callback_query(call):
                     #     f.write(line[1])
                     #     bot.send_photo(chat_id=call.message.chat.id, photo=open("files/image.jpg", "rb"))
                     break
+            bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
 @bot.message_handler(content_types=["text"])
