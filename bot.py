@@ -1,9 +1,12 @@
+import sqlite3
 import threading
 
 import config
 import telebot
 import db
 from telebot import types
+from pathlib import Path
+
 from datetime import datetime
 import time
 
@@ -29,7 +32,8 @@ def menu_key():
     but_1 = types.InlineKeyboardButton(text="📉 Расходы", callback_data="ex")
     but_2 = types.InlineKeyboardButton(text="📈 Доходы", callback_data="in")
     but_3 = types.InlineKeyboardButton(text="📃 Статистика", callback_data="data")
-    key.add(but_1, but_2, but_3)
+    but_4 = types.InlineKeyboardButton(text="Дисконтные карты", callback_data="cards")
+    key.add(but_1, but_2, but_3, but_4)
     return key
 
 
@@ -122,6 +126,25 @@ def get_data_period(message, user_id, type, ex_in, sum_all):
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
+def get_card_name(message, user_id, name):
+    bot.clear_step_handler_by_chat_id(chat_id=message.chat.id)
+    if message.content_type == 'text':
+        mesg = bot.send_message(message.chat.id,
+                                "Отправьте фото")
+        bot.register_next_step_handler(mesg, lambda m: get_card_name(message=m, user_id=user_id, name=message.text))
+    if message.content_type == 'photo':
+        Path(f'files/{message.chat.id}/photos').mkdir(parents=True, exist_ok=True)
+
+        file_info = bot.get_file(message.photo[len(message.photo) - 1].file_id)
+        src = f'files/{message.chat.id}/' + file_info.file_path
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(src, 'rb') as f:
+            binary = sqlite3.Binary(f.read())
+
+        db.add_card(user_id=user_id, name=name, card=binary)
+        bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
+
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     if call.message:
@@ -196,6 +219,46 @@ def callback_query(call):
                                            lambda m: get_data_period(message=m, user_id=call.from_user.id,
                                                                      type=-1 if call.data[len("data_ex_"):call.data.rfind("_")] == "all" else call.data[len("data_ex_"):call.data.rfind("_")],
                                                                      ex_in=call.data[5:7], sum_all=call.data[-3:]))
+
+        if call.data == "cards":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
+            key = types.InlineKeyboardMarkup()
+            but_1 = types.InlineKeyboardButton(text="Получить карту", callback_data="cards_get")
+            but_2 = types.InlineKeyboardButton(text="Добавить карту", callback_data="cards_add")
+            but_3 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
+            key.add(but_1, but_2, but_3)
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                  text="📎 Выберите действие:",
+                                  reply_markup=key)
+
+        if call.data == "cards_add":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
+            mesg = bot.send_message(call.message.chat.id, "Введите название")
+            bot.register_next_step_handler(mesg, lambda m: get_card_name(message=m, user_id=call.from_user.id, name=""))
+
+        if call.data == "cards_get":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
+            key = types.InlineKeyboardMarkup()
+            for line in db.get_cards(user_id=call.from_user.id):
+                key.add(types.InlineKeyboardButton(text=line[0], callback_data="cards_get_" + line[0]))
+            key.add(types.InlineKeyboardButton(text="📌 Меню", callback_data="menu"))
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                  text="Выберите магазин:",
+                                  reply_markup=key)
+
+        if len(call.data) >= len("cards_get_") and call.data[:len("cards_get_")] == "cards_get_":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
+            for line in db.get_cards(user_id=call.from_user.id):
+                if line[0] == call.data[len("cards_get_"):]:
+                    bot.send_photo(chat_id=call.message.chat.id, photo=line[1])
+                    # with open("files/image.jpg", "wb") as f:
+                    #     f.write(line[1])
+                    #     bot.send_photo(chat_id=call.message.chat.id, photo=open("files/image.jpg", "rb"))
+                    break
+
+
+
+
 
 
 @bot.message_handler(content_types=["text"])
