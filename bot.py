@@ -108,7 +108,9 @@ def get_data_period(message, user_id, type, ex_in, sum_all):
         sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=True)
         bot.send_message(message.chat.id, text="Сумма:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
         if sum_all == "all":
-            bot.send_message(message.chat.id, text=f'<pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=True).get_string()}</pre>', parse_mode="HTML")
+            bot.send_message(message.chat.id,
+                             text=f'<pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=True).get_string()}</pre>',
+                             parse_mode="HTML")
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
         return
     if len(message.text) != 21 or is_incorrect_date_format(message.text[:10]) or is_incorrect_date_format(
@@ -119,10 +121,13 @@ def get_data_period(message, user_id, type, ex_in, sum_all):
     else:
         data_start = message.text[:10]
         data_end = message.text[11:]
-        sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=False, data_start=data_start, data_end=data_end)
+        sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=False, data_start=data_start,
+                         data_end=data_end)
         bot.send_message(message.chat.id, text="Сумма:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
         if sum_all == "all":
-            bot.send_message(message.chat.id, text=f'<pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, data_start=data_start, data_end=data_end).get_string()}</pre>', parse_mode="HTML")
+            bot.send_message(message.chat.id,
+                             text=f'<pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, data_start=data_start, data_end=data_end).get_string()}</pre>',
+                             parse_mode="HTML")
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
@@ -138,6 +143,8 @@ def get_card_name(message, user_id, name):
         file_info = bot.get_file(message.photo[len(message.photo) - 1].file_id)
         src = f'files/{message.chat.id}/' + file_info.file_path
         downloaded_file = bot.download_file(file_info.file_path)
+        with open(src, 'wb') as f_d:
+            f_d.write(downloaded_file)
         with open(src, 'rb') as f:
             binary = sqlite3.Binary(f.read())
 
@@ -182,7 +189,7 @@ def callback_query(call):
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="📎 Выберите категорию:", reply_markup=key)
 
-         # data_ex_numcat_all
+        # data_ex_numcat_all
         if call.data == "data_balance":
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             bot.send_message(call.message.chat.id, 'Баланс:' + '\n' + one_tuple_to_str(
@@ -193,9 +200,12 @@ def callback_query(call):
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="📎 Выберите категорию:",
                                   reply_markup=category_key(user_id=call.from_user.id, ex_in=call.data[5:],
-                                                            callback=call.data+"_").add(types.InlineKeyboardButton(text="📎 Все категории", callback_data=call.data+"_all")))
+                                                            callback=call.data + "_").add(
+                                      types.InlineKeyboardButton(text="📎 Все категории",
+                                                                 callback_data=call.data + "_all")))
 
-        if call.data.count("_") == 2 and (call.data[:len("data_ex_")] == "data_ex_" or call.data[:len("data_in_")] == "data_in_"):
+        if call.data.count("_") == 2 and (
+                call.data[:len("data_ex_")] == "data_ex_" or call.data[:len("data_in_")] == "data_in_"):
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="💰 Сумма", callback_data=call.data + "_sum")
@@ -206,7 +216,9 @@ def callback_query(call):
                                   text="Выберите тип:",
                                   reply_markup=key)
 
-        if call.data.count("_") == 3 and (call.data[:len("data_ex_")] == "data_ex_" or call.data[:len("data_in_")] == "data_in_") and (call.data[-4:] == "_sum" or call.data[-4:] == "_all"):
+        if call.data.count("_") == 3 and (
+                call.data[:len("data_ex_")] == "data_ex_" or call.data[:len("data_in_")] == "data_in_") and (
+                call.data[-4:] == "_sum" or call.data[-4:] == "_all"):
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             bot.answer_callback_query(call.id, "Введите период")
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -217,7 +229,11 @@ def callback_query(call):
                                     reply_markup=markup)
             bot.register_next_step_handler(mesg,
                                            lambda m: get_data_period(message=m, user_id=call.from_user.id,
-                                                                     type=-1 if call.data[len("data_ex_"):call.data.rfind("_")] == "all" else call.data[len("data_ex_"):call.data.rfind("_")],
+                                                                     type=-1 if call.data[
+                                                                                len("data_ex_"):call.data.rfind(
+                                                                                    "_")] == "all" else call.data[
+                                                                                                        len("data_ex_"):call.data.rfind(
+                                                                                                            "_")],
                                                                      ex_in=call.data[5:7], sum_all=call.data[-3:]))
 
         if call.data == "cards":
@@ -233,7 +249,7 @@ def callback_query(call):
 
         if call.data == "cards_add":
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
-            mesg = bot.send_message(call.message.chat.id, "Введите название")
+            mesg = bot.send_message(call.message.chat.id, "✔️ Введите название")
             bot.register_next_step_handler(mesg, lambda m: get_card_name(message=m, user_id=call.from_user.id, name=""))
 
         if call.data == "cards_get":
@@ -243,7 +259,7 @@ def callback_query(call):
                 key.add(types.InlineKeyboardButton(text=line[0], callback_data="cards_get_" + line[0]))
             key.add(types.InlineKeyboardButton(text="📌 Меню", callback_data="menu"))
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                  text="Выберите магазин:",
+                                  text="✔️ Выберите магазин:",
                                   reply_markup=key)
 
         if len(call.data) >= len("cards_get_") and call.data[:len("cards_get_")] == "cards_get_":
@@ -255,10 +271,6 @@ def callback_query(call):
                     #     f.write(line[1])
                     #     bot.send_photo(chat_id=call.message.chat.id, photo=open("files/image.jpg", "rb"))
                     break
-
-
-
-
 
 
 @bot.message_handler(content_types=["text"])
