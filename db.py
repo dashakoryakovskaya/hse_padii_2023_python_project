@@ -1,4 +1,5 @@
 import sqlite3
+import bot
 from prettytable import from_db_cursor
 
 __connection = None
@@ -96,10 +97,14 @@ def init_db(conn, flag_drop: bool = False):
         CREATE TABLE IF NOT EXISTS reminders (
         id INTEGER PRIMARY KEY,
         user_id INTEGER,
-        title TEXT,
         type INTEGER,
-        date DATE,
-        time TIME
+        date DATETIME
+        );''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS reminders_text (
+        id INTEGER PRIMARY KEY,
+        text TINYTEXT
         );''')
 
     conn.commit()
@@ -313,25 +318,36 @@ def get_all_user_ids(conn):
 
 
 @ensure_connection
-def get_all_reminders(conn):
+def get_all_reminders(conn, user_id: int):
     c = conn.cursor()
-    c.execute('SELECT user_id, title, type, date, time FROM reminders;')
+    c.execute(f'SELECT id, type, date FROM reminders WHERE user_id={user_id};')
     res = c.fetchall()
-    print(res)
+    # print(res)
     return res
 
 
 @ensure_connection
-def add_reminder(conn, user_id: int, time: str, date='', title='', type=0):
+def add_reminder(conn, user_id: int, date='', text="Мечтаю узнать о том, сколько ты сегодня потратил! Ну и получил", type=0):
     # conn = get_connection()
     c = conn.cursor()
-    c.execute('INSERT INTO reminders (user_id, title, type, date, time) VALUES (?, ?, ?, ?, ?);',
-              (user_id, title, type, date, time))
+    c.execute('INSERT INTO reminders (user_id, type, date) VALUES (?, ?, ?);',
+              (user_id, type, date))
+    c.execute('INSERT INTO reminders_text (text) VALUES (?)', [text])
+    c.execute(f'SELECT id FROM reminders WHERE user_id={user_id} AND type={type} AND date={date}')
+    notification_id = c.fetchall()[0][0]
+    bot.create_notification(notification_id, type, user_id, text, date)
+
     conn.commit()
 
 
-def add_base_reminder(user_id: int, time: str):
-    add_reminder(user_id=user_id, time=time, title='Мечтаю узнать о том, сколько ты сегодня потратил! Ну и получил)))')
+@ensure_connection
+def erase_reminder(conn, notification_id: int):
+    c = conn.cursor()
+    c.execute(f'DELETE FROM reminders WHERE id={notification_id};')
+    c.execute(f'DELETE FROM reminders_text WHERE id={notification_id};')
+    bot.cancel_notification(notification_id)
+
+    conn.commit()
 
 
 @ensure_connection

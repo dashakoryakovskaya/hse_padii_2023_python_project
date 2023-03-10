@@ -5,7 +5,6 @@ import db
 from telebot import types
 from datetime import datetime
 import time
-from datetime import date
 # from notifiers import get_notifier
 import schedule
 
@@ -26,19 +25,31 @@ def one_tuple_to_str(tup: tuple):
     return str(tup[0][0])
 
 
-def daily_notification(id, text):
-    bot.send_message(id, text)
+def daily_notification(user_id, text):
+    bot.send_message(user_id, text)
 
-def monthly_notification(id, text):
-    return
-    # TODO: настроить ежемесячные уведомления, проверка даты каждый день
-    # bot.send_message(id, text)
+
+def monthly_notification(user_id, text, date):
+    if datetime.now().day == date[8:-9]:
+        bot.send_message(user_id, text)
 
 
 def notify():
     while not STOP_BOT_FLAG:
         schedule.run_pending()
         time.sleep(1)
+
+
+def create_notification(notification_id, notification_type, user_id, text, date):
+    if notification_type == 0:
+        schedule.every().day.at(date[11:-3]).do(daily_notification, user_id, text).tag(notification_id)
+    else:
+        schedule.every().day.at(date[11:-3]).do(monthly_notification, user_id, text, date).tag(notification_id)
+
+
+def cancel_notification(notification_id: int):
+    schedule.clear(notification_id)
+
 
 # меню для главного меню и категорий
 def menu_key():
@@ -235,7 +246,7 @@ def messages(message):
             db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={message.from_user.id};")))
 
     if message.text == 'add notification':
-        db.add_base_reminder(user_id=message.chat.id, time='01:40:00')
+        db.add_reminder(user_id=message.chat.id, date='1212-12-12 01:40:00')
 
 
 
@@ -251,14 +262,14 @@ def main():
 
 if __name__ == '__main__':
     # TODO: нужен ли тут flag_drop=True ?
-    db.init_db(flag_drop=False)
-    for element in db.get_all_reminders():
-        # user_id->0 title->1 type->2 date->3 time->4
-        if element[2] == 0:
-            schedule.every().day.at(element[4][:-3]).do(daily_notification, element[0], element[1])
-            # schedule.every(5).seconds.do(daily_notification, 219102395, "Привет, я пришлюсь кучу раз")
-        else:
-            schedule.every().day.at(element[4][:-3]).do(monthly_notification, element[0], element[1])
+    db.init_db(flag_drop=True)
+    # for element in db.get_all_reminders():
+    #     # user_id->0 title->1 type->2 date->3 time->4
+    #     if element[2] == 0:
+    #         schedule.every().day.at(element[4][:-3]).do(daily_notification, element[0], element[1])
+    #         # schedule.every(5).seconds.do(daily_notification, 219102395, "Привет, я пришлюсь кучу раз")
+    #     else:
+    #         schedule.every().day.at(element[4][:-3]).do(monthly_notification, element[0], element[1])
 
     main()
 
