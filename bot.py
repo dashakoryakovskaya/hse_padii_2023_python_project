@@ -30,7 +30,7 @@ def daily_notification(user_id, text):
 
 
 def monthly_notification(user_id, text, date):
-    if datetime.now().day == date[8:-9]:
+    if datetime.now().day == date[8:]:
         bot.send_message(user_id, text)
 
 
@@ -40,11 +40,13 @@ def notify():
         time.sleep(1)
 
 
-def create_notification(notification_id, notification_type, user_id, text, date):
+def create_notification(notification_id, notification_type, user_id, text, date, time):
+    # print(time[:-3])
+    # print(date[8:])
     if notification_type == 0:
-        schedule.every().day.at(date[11:-3]).do(daily_notification, user_id, text).tag(notification_id)
+        schedule.every().day.at(time[:-3]).do(daily_notification, user_id, text).tag(notification_id)
     else:
-        schedule.every().day.at(date[11:-3]).do(monthly_notification, user_id, text, date).tag(notification_id)
+        schedule.every().day.at(time[:-3]).do(monthly_notification, user_id, text, date).tag(notification_id)
 
 
 def cancel_notification(notification_id: int):
@@ -246,7 +248,10 @@ def messages(message):
             db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={message.from_user.id};")))
 
     if message.text == 'add notification':
-        db.add_reminder(user_id=message.chat.id, date='1212-12-12 01:40:00')
+        db.add_reminder(user_id=message.chat.id, date='1212-12-12', time='00:50:00')
+
+    if message.text == 'delete notification':
+        db.erase_reminder(notification_id=1)
 
 
 
