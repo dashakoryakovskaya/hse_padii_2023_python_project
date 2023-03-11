@@ -171,7 +171,7 @@ def get_data_period(message, user_id, type, ex_in, sum_all):
 
 def get_rem_data(message, user_id, type, cat):
     if 1 <= int(message.text) <= 31:
-        mesg = bot.send_message(message.chat.id, "🕛 Введите время в формате HH:MM:SS")
+        mesg = bot.send_message(message.chat.id, "🕛 Введите время в формате HH:MM")
         bot.register_next_step_handler(mesg,
                                        lambda m: get_rem_time(message=m, user_id=user_id, type=type,
                                                               cat=cat, day=int(message.text)))
@@ -182,14 +182,14 @@ def get_rem_data(message, user_id, type, cat):
 
 
 def is_incorrect_time_format(string):
-    return len(string) != 8 or string[2] != ":" or string[5] != ":" or not string[:2].isdigit() \
-        or not string[3:5].isdigit() or not string[6:].isdigit() or (24 <= int(string[:2]) or int(string[:2]) < 0) \
-        or (60 <= int(string[3:5]) or int(string[3:5]) < 0) or (60 <= int(string[6:]) or int(string[6:]) < 0)
+    return len(string) != 5 or string[2] != ":" or not string[:2].isdigit() \
+        or not string[3:5].isdigit() or (24 <= int(string[:2]) or int(string[:2]) < 0) \
+        or (60 <= int(string[3:]) or int(string[3:]) < 0)
 
 
 def get_rem_time(message, user_id, type, cat, day=-1):
     if is_incorrect_time_format(message.text):
-        mesg = bot.send_message(message.chat.id, "😥 Неправильный формат HH:MM:SS\nВведите еще раз:")
+        mesg = bot.send_message(message.chat.id, "😥 Неправильный формат HH:MM\nВведите еще раз:")
         bot.register_next_step_handler(mesg,
                                        lambda m: get_rem_time(message=m, user_id=user_id, type=type, cat=cat, day=day))
     else:
@@ -200,7 +200,7 @@ def get_rem_time(message, user_id, type, cat, day=-1):
 
 
 def get_rem_text(message, user_id, type, cat, day, time):
-    db.add_reminder(user_id=user_id, time=time, category=cat, date=day, text=message.text, type=type)
+    db.add_reminder(user_id=user_id, time=time+":00", category=cat, date=day, text=message.text, type=type)
     bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
@@ -328,7 +328,7 @@ def callback_query(call):
 
         if call.data[:len("remind_add_0_")] == "remind_add_0_" and call.data.count("_") == 3:
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
-            mesg = bot.send_message(call.message.chat.id, "🕛 Введите время в формате HH:MM:SS")
+            mesg = bot.send_message(call.message.chat.id, "🕛 Введите время в формате HH:MM")
             bot.register_next_step_handler(mesg,
                                            lambda m: get_rem_time(message=m, user_id=call.from_user.id, type=0,
                                                                   cat=call.data[
@@ -339,7 +339,7 @@ def callback_query(call):
             list_rem = db.get_all_reminders(user_id=call.from_user.id)
             for l in list_rem:
                 text = db.sql_execute(sql=f"SELECT text FROM reminders_text WHERE id = {l[0]}")[0][0]
-                key.add(types.InlineKeyboardButton(text=text + " " + (str(l[2]) + " " if l[1] == 1 else "") + l[3], callback_data="remind_del_" + str(l[0])))
+                key.add(types.InlineKeyboardButton(text=text[:20] + ("... " if len(text) > 20 else " ") + l[3][:5] + (" " + str(l[2]) if l[1] == 1 else ""), callback_data="remind_del_" + str(l[0])))
             key.add(types.InlineKeyboardButton(text="📌 Меню", callback_data="menu"))
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="Выберите напоминание:",
