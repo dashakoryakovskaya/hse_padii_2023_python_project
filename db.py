@@ -342,7 +342,7 @@ def add_reminder(conn, user_id: int, time = '', category=-1, date=-1, text="Ме
         c.execute(f'SELECT id FROM reminders WHERE user_id={user_id} AND type={type} AND date={date} AND time=\'{time}\';')
     notification_id = c.fetchall()[0][0]
     # print(notification_id)
-    bot.create_notification(notification_id, type, user_id, text, date, time)
+    bot.create_notification(notification_id, type, user_id, text, date, time, category)
 
     conn.commit()
 

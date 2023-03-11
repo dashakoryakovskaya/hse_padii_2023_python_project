@@ -26,13 +26,22 @@ def one_tuple_to_str(tup: tuple):
     return str(tup[0][0])
 
 
-def daily_notification(user_id, text):
-    bot.send_message(user_id, text)
-
-
-def monthly_notification(user_id, text, date):
-    if datetime.now().day == date:
+def daily_notification(user_id, text, category):
+    if category != -1:
+        key = types.InlineKeyboardMarkup()
+        key.add(types.InlineKeyboardButton(text="Хочу внести расходы", callback_data="ex_" + str(category)))
+        bot.send_message(user_id, text, reply_markup=key)
+    else:
         bot.send_message(user_id, text)
+
+
+def monthly_notification(user_id, text, date, category):
+    if datetime.now().day == date and category == -1:
+        bot.send_message(user_id, text)
+    elif datetime.now().day == date and category != -1:
+        key = types.InlineKeyboardMarkup()
+        key.add(types.InlineKeyboardButton(text="Хочу внести расходы", callback_data="ex_" + str(category)))
+        bot.send_message(user_id, text, reply_markup=key)
 
 
 def notify():
@@ -41,14 +50,14 @@ def notify():
         time.sleep(1)
 
 
-def create_notification(notification_id, notification_type, user_id, text, date, time):
+def create_notification(notification_id, notification_type, user_id, text, date, time, category):
     # schedule.every(5).seconds.do(daily_notification, user_id, text).tag(notification_id)
     # print(time[:-3])
     # print(date[8:])
     if notification_type == 0:
-        schedule.every().day.at(time[:-3]).do(daily_notification, user_id, text).tag(notification_id)
+        schedule.every().day.at(time[:-3]).do(daily_notification, user_id, text, category).tag(notification_id)
     else:
-        schedule.every().day.at(time[:-3]).do(monthly_notification, user_id, text, date).tag(notification_id)
+        schedule.every().day.at(time[:-3]).do(monthly_notification, user_id, text, date, category).tag(notification_id)
 
 
 def cancel_notification(notification_id: int):
