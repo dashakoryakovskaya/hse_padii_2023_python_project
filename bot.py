@@ -334,6 +334,22 @@ def callback_query(call):
                                                                   cat=call.data[
                                                                       len("remind_add_0_"):]))
 
+        if call.data == "remind_del":
+            key = types.InlineKeyboardMarkup()
+            list_rem = db.get_all_reminders(user_id=call.from_user.id)
+            for l in list_rem:
+                text = db.sql_execute(sql=f"SELECT text FROM reminders_text WHERE id = {l[0]}")[0][0]
+                key.add(types.InlineKeyboardButton(text=text + " " + (str(l[2]) + " " if l[1] == 1 else "") + l[3], callback_data="remind_del_" + str(l[0])))
+            key.add(types.InlineKeyboardButton(text="📌 Меню", callback_data="menu"))
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                  text="Выберите напоминание:",
+                                  reply_markup=key)
+
+        if call.data[:len("remind_del_")] == "remind_del_":
+            db.erase_reminder(notification_id=int(call.data[len("remind_del_"):]))
+            bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
+
+
 
 @bot.message_handler(content_types=["text"])
 def messages(message):
@@ -375,6 +391,6 @@ def main():
 
 if __name__ == '__main__':
     # TODO: нужен ли тут flag_drop=True ?
-    db.init_db(flag_drop=True)
+    db.init_db(flag_drop=False)
 
     main()
