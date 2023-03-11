@@ -11,6 +11,7 @@ import schedule
 bot = telebot.TeleBot(config.token)
 
 tconv = lambda x: time.strftime("%Y-%m-%d", time.localtime(x))
+tconv_time = lambda x: time.strftime("%H:%M", time.localtime(x))
 
 STOP_BOT_FLAG = False
 
@@ -171,7 +172,10 @@ def get_data_period(message, user_id, type, ex_in, sum_all):
 
 def get_rem_data(message, user_id, type, cat):
     if 1 <= int(message.text) <= 31:
-        mesg = bot.send_message(message.chat.id, "🕛 Введите время в формате HH:MM")
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        btn1 = types.KeyboardButton("Текущее время")
+        markup.add(btn1)
+        mesg = bot.send_message(message.chat.id, "🕛 Введите время в формате HH:MM", reply_markup=markup)
         bot.register_next_step_handler(mesg,
                                        lambda m: get_rem_time(message=m, user_id=user_id, type=type,
                                                               cat=cat, day=int(message.text)))
@@ -188,15 +192,16 @@ def is_incorrect_time_format(string):
 
 
 def get_rem_time(message, user_id, type, cat, day=-1):
-    if is_incorrect_time_format(message.text):
+    if message.text != "Текущее время" and is_incorrect_time_format(message.text):
         mesg = bot.send_message(message.chat.id, "😥 Неправильный формат HH:MM\nВведите еще раз:")
         bot.register_next_step_handler(mesg,
                                        lambda m: get_rem_time(message=m, user_id=user_id, type=type, cat=cat, day=day))
     else:
-        mesg = bot.send_message(message.chat.id, "Введите текст:")
+        mesg = bot.send_message(message.chat.id, "Введите текст:", reply_markup=types.ReplyKeyboardRemove())
+        time = message.text if message.text != "Текущее время" else tconv_time(message.date)
         bot.register_next_step_handler(mesg,
                                        lambda m: get_rem_text(message=m, user_id=user_id, type=type, cat=cat, day=day,
-                                                              time=message.text))
+                                                              time=time))
 
 
 def get_rem_text(message, user_id, type, cat, day, time):
@@ -328,13 +333,17 @@ def callback_query(call):
 
         if call.data[:len("remind_add_0_")] == "remind_add_0_" and call.data.count("_") == 3:
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
-            mesg = bot.send_message(call.message.chat.id, "🕛 Введите время в формате HH:MM")
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+            btn1 = types.KeyboardButton("Текущее время")
+            markup.add(btn1)
+            mesg = bot.send_message(call.message.chat.id, "🕛 Введите время в формате HH:MM", reply_markup=markup)
             bot.register_next_step_handler(mesg,
                                            lambda m: get_rem_time(message=m, user_id=call.from_user.id, type=0,
                                                                   cat=call.data[
                                                                       len("remind_add_0_"):]))
 
         if call.data == "remind_del":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
             list_rem = db.get_all_reminders(user_id=call.from_user.id)
             for l in list_rem:
@@ -346,6 +355,7 @@ def callback_query(call):
                                   reply_markup=key)
 
         if call.data[:len("remind_del_")] == "remind_del_":
+            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             db.erase_reminder(notification_id=int(call.data[len("remind_del_"):]))
             bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
