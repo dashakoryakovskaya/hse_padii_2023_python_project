@@ -99,8 +99,9 @@ def init_db(conn, flag_drop: bool = False):
         id INTEGER PRIMARY KEY,
         user_id INTEGER,
         type INTEGER,
-        date DATE,
-        time TIME
+        date INT,
+        time TIME,
+        category INT
         );''')
 
     c.execute('''
@@ -322,23 +323,23 @@ def get_all_user_ids(conn):
 @ensure_connection
 def get_all_reminders(conn, user_id: int):
     c = conn.cursor()
-    c.execute(f'SELECT id, type, date, time FROM reminders WHERE user_id={user_id};')
+    c.execute(f'SELECT id, type, date, time, category FROM reminders WHERE user_id={user_id};')
     res = c.fetchall()
     # print(res)
     return res
 
 
 @ensure_connection
-def add_reminder(conn, user_id: int, date='', time = '', text="Мечтаю узнать о том, сколько ты сегодня потратил! Ну и получил🤑", type=0):
+def add_reminder(conn, user_id: int, time = '', category=-1, date=-1, text="Мечтаю узнать о том, сколько ты сегодня потратил! Ну и получил🤑", type=0):
     # conn = get_connection()
     c = conn.cursor()
-    c.execute('INSERT INTO reminders (user_id, type, date, time) VALUES (?, ?, ?, ?);',
-              (user_id, type, date, time))
+    c.execute('INSERT INTO reminders (user_id, type, date, time, category) VALUES (?, ?, ?, ?, ?);',
+              (user_id, type, date, time, category))
     c.execute('INSERT INTO reminders_text (text) VALUES (?);', [text])
     if type == 0:
         c.execute(f'SELECT id FROM reminders WHERE user_id={user_id} AND type={type} AND time=\'{time}\';')
     else:
-        c.execute(f'SELECT id FROM reminders WHERE user_id={user_id} AND type={type} AND date=\'{date}\' AND time=\'{time}\';')
+        c.execute(f'SELECT id FROM reminders WHERE user_id={user_id} AND type={type} AND date={date} AND time=\'{time}\';')
     notification_id = c.fetchall()[0][0]
     # print(notification_id)
     bot.create_notification(notification_id, type, user_id, text, date, time)
