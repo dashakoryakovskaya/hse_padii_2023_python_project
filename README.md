@@ -1,2 +1,2 @@
-# hse_padii_2023_python_project
+# Telegram бот для отслеживания личных финансов
 @finance_tracking_bot
