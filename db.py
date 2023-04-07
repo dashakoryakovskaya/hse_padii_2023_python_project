@@ -1,4 +1,5 @@
 import sqlite3
+import bot
 from prettytable import from_db_cursor
 
 __connection = None
@@ -9,6 +10,8 @@ ex_default_categories_rev = {1: 'Развлечения', 2: 'Автомобил
                              7: 'Подарки', 8: 'Семейные расходы', 9: 'Услуги', 10: 'Другое'}
 in_default_categories = {'Зарплата': 1, 'Подарок': 2, 'Инвестиции': 3, 'Другое': 4}
 in_default_categories_rev = {1: 'Зарплата', 2: 'Подарок', 3: 'Инвестиции', 4: 'Другое'}
+
+kinds_of_notification = {0: "Ежедневные", 1: "По дате"}
 
 
 def ensure_connection(func):
@@ -41,6 +44,7 @@ def init_db(conn, flag_drop: bool = False):
         # c.execute('DROP TABLE IF EXISTS expenses_categories')
         c.execute('DROP TABLE IF EXISTS reminders')
         c.execute('DROP TABLE IF EXISTS cards')
+        c.execute('DROP TABLE IF EXISTS reminders_text')
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS user (
@@ -95,8 +99,16 @@ def init_db(conn, flag_drop: bool = False):
         CREATE TABLE IF NOT EXISTS reminders (
         id INTEGER PRIMARY KEY,
         user_id INTEGER,
-        name TEXT,
-        date DATE
+        type INTEGER,
+        date INT,
+        time TIME,
+        category INT
+        );''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS reminders_text (
+        id INTEGER PRIMARY KEY,
+        text TINYTEXT
         );''')
 
     c.execute('''
@@ -187,11 +199,11 @@ def get_sum(conn, user_id: int, type: int, ex_in: str, all_period=False, data_st
     else:
         ex_in = "incomes"
     if type == -1:
-        sql = f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id};' if all_period else \
-            f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id} AND date BETWEEN {data_start} AND {data_end};'
+        sql = f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id}' if all_period else \
+            f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id} AND date BETWEEN \'{data_start}\' AND \'{data_end}\''
     else:
-        sql = f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id} AND type={type};' if all_period else \
-            f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id} AND type={type} AND date BETWEEN {data_start} AND {data_end};'
+        sql = f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id} AND type={type}' if all_period else \
+            f'SELECT SUM(sum) FROM {ex_in} WHERE user_id={user_id} AND type={type} AND date BETWEEN \'{data_start}\' AND \'{data_end}\''
 
     c = conn.cursor()
     c.execute(sql)
@@ -228,11 +240,11 @@ def get_all_statistic(conn, user_id: int, type: int, ex_in: str, all_period=Fals
     else:
         ex_in = "incomes"
     if type == -1:
-        sql = f'SELECT sum, date, type FROM {ex_in} WHERE user_id={user_id};' if all_period else \
-            f'SELECT sum, date, type FROM {ex_in} WHERE user_id={user_id} AND date BETWEEN {data_start} AND {data_end};'
+        sql = f'SELECT sum, date, type FROM {ex_in} WHERE user_id={user_id}' if all_period else \
+            f'SELECT sum, date, type FROM {ex_in} WHERE user_id={user_id} AND date BETWEEN \'{data_start}\' AND \'{data_end}\''
     else:
         sql = f'SELECT sum, date, type FROM {ex_in} WHERE user_id={user_id} AND type={type};' if all_period else \
-            f'SELECT sum, date, type FROM {ex_in} WHERE user_id={user_id} AND type={type} AND date BETWEEN {data_start} AND {data_end};'
+            f'SELECT sum, date, type FROM {ex_in} WHERE user_id={user_id} AND type={type} AND date BETWEEN \'{data_start}\' AND \'{data_end}\''
 
 
     c.execute(sql)
@@ -310,11 +322,47 @@ def get_categories(ex_in: str):
 
 
 @ensure_connection
-def add_reminder(conn, user_id: int, name: str, date: str):
+def get_all_user_ids(conn):
+    c = conn.cursor()
+    c.execute('SELECT user_id FROM user')
+    res = c.fetchall()
+    return res
+
+
+@ensure_connection
+def get_all_reminders(conn, user_id: int):
+    c = conn.cursor()
+    c.execute(f'SELECT id, type, date, time, category FROM reminders WHERE user_id={user_id};')
+    res = c.fetchall()
+    # print(res)
+    return res
+
+
+@ensure_connection
+def add_reminder(conn, user_id: int, time = '', category=-1, date=-1, text="Мечтаю узнать о том, сколько ты сегодня потратил! Ну и получил🤑", type=0):
     # conn = get_connection()
     c = conn.cursor()
-    c.execute('INSERT INTO reminders (user_id, name, date) VALUES (?, ?, ?);',
-              (user_id, name, date))
+    c.execute('INSERT INTO reminders (user_id, type, date, time, category) VALUES (?, ?, ?, ?, ?);',
+              (user_id, type, date, time, category))
+    c.execute('INSERT INTO reminders_text (text) VALUES (?);', [text])
+    if type == 0:
+        c.execute(f'SELECT id FROM reminders WHERE user_id={user_id} AND type={type} AND time=\'{time}\';')
+    else:
+        c.execute(f'SELECT id FROM reminders WHERE user_id={user_id} AND type={type} AND date={date} AND time=\'{time}\';')
+    notification_id = c.fetchall()[0][0]
+    # print(notification_id)
+    bot.create_notification(notification_id, type, user_id, text, date, time, category)
+
+    conn.commit()
+
+
+@ensure_connection
+def erase_reminder(conn, notification_id: int):
+    c = conn.cursor()
+    c.execute(f'DELETE FROM reminders WHERE id={notification_id};')
+    c.execute(f'DELETE FROM reminders_text WHERE id={notification_id};')
+    bot.cancel_notification(notification_id)
+
     conn.commit()
 
 
