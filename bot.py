@@ -361,8 +361,9 @@ def callback_query(call):
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="📃 Получить карту", callback_data="cards_get")
             but_2 = types.InlineKeyboardButton(text="✅ Добавить карту", callback_data="cards_add")
-            but_3 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
-            key.add(but_1, but_2, but_3)
+            but_3 = types.InlineKeyboardButton(text="❌ Удалить карту", callback_data="cards_del")
+            but_4 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
+            key.add(but_1, but_2, but_3, but_4)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="📎 Выберите действие:",
                                   reply_markup=key)
@@ -390,10 +391,24 @@ def callback_query(call):
                     break
             bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
+        if call.data == "cards_del":
+            key = types.InlineKeyboardMarkup()
+            list_rem = db.get_all_cards_name(user_id=call.from_user.id)
+            for l in list_rem:
+                key.add(types.InlineKeyboardButton(text=l[0], callback_data="cards_del_" + str(l[0])))
+            key.add(types.InlineKeyboardButton(text="📌 Меню", callback_data="menu"))
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                  text="Выберите карту:",
+                                  reply_markup=key)
+
+        if call.data[:len("cards_del_")] == "cards_del_":
+            db.erase_card(user_id=call.from_user.id, name=call.data[len("cards_del_"):])
+            bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
+
         if call.data == "remind":
             key = types.InlineKeyboardMarkup()
-            but_1 = types.InlineKeyboardButton(text="Добавить напоминание", callback_data=call.data + "_add")
-            but_2 = types.InlineKeyboardButton(text="Удалить напоминание", callback_data=call.data + "_del")
+            but_1 = types.InlineKeyboardButton(text="✅ Добавить напоминание", callback_data=call.data + "_add")
+            but_2 = types.InlineKeyboardButton(text="❌ Удалить напоминание", callback_data=call.data + "_del")
             but_3 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
             key.add(but_1, but_2, but_3)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
