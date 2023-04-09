@@ -7,9 +7,6 @@ import os
 from fns import FnsAccess
 
 bot = telebot.TeleBot(config.token)
-global phonenum
-global code
-global qr_code
 
 def list_of_tuples_to_str(list_tup: list):
     string = ''
