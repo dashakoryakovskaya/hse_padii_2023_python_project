@@ -1,13 +1,15 @@
-import threading
-
-import config
 import telebot
+import config
 import db
 import cv2
 import os
 
-bot = telebot.TeleBot(config.token)
+from fns import FnsAccess
 
+bot = telebot.TeleBot(config.token)
+global phonenum
+global code
+global qr_code
 
 def list_of_tuples_to_str(list_tup: list):
     string = ''
@@ -36,8 +38,6 @@ def start_message(message):
 
 @bot.message_handler(content_types=["text"])
 def repeat_all_messages(message):  # TODO: поменять название функции))
-    # bot.send_message(message.chat.id, str(threading.current_thread().ident))
-    # TODO: сделать это все через меню / кнопки, категории!!
     if message.text[0] == '+':
         db.add_incomes(user_id=message.from_user.id, name=message.from_user.username, date=message.date,
                        sum=int(message.text[1:]), type='')
@@ -59,27 +59,39 @@ def repeat_all_messages(message):  # TODO: поменять название ф�
         bot.register_next_step_handler(message, qr_code_reader)
 
 
-@bot.message_handler(content_types=['photo'])  # TODO: удается только один раз отправить qr, дальше вылетает
-def qr_code_reader(
-        message):  # TODO: (если были неуспешные попытки - то можно отправлять до первой успешной, дальше вылетает)
-    file_info = bot.get_file(message.photo[
-                                 len(message.photo) - 1].file_id)  # TODO: также получается просто прислать qr код сразу после start, без педварительного вызова команды *qr*
-    downloaded_file = bot.download_file(file_info.file_path)  # TODO: плохо это, или хорошо - хз
+@bot.message_handler(content_types=['photo', 'document'])
+def qr_code_reader(message):
+    file_info = bot.get_file(message.photo[len(message.photo) - 1].file_id)
+    downloaded_file = bot.download_file(file_info.file_path)
     src = file_info.file_path
 
     with open(src, 'wb') as new_file:
         new_file.write(downloaded_file)
 
-    # bot.send_photo(message.chat.id, open(src, 'rb')) присылает отправленное фото в ответ, было просто для проверки
     try:
         img_qr = cv2.imread(src)
         detector = cv2.QRCodeDetector()
         data, bbox, clear_qr = detector.detectAndDecode(img_qr)
-        bot.send_message(message.chat.id, data)
-    except:
-        bot.send_message(message.chat.id, 'Попробуйте еще раз, не удалось распознать qr код :(')
-    os.remove(file_info.file_path)  # удаление изображения с чеком после распознавания
+        qr_code = data
+        bot.send_message(message.chat.id, 'Успешно!')
 
+        client = FnsAccess()
+        ticket = client.get_ticket(qr_code)
+
+        elements = ticket["ticket"]["document"]["receipt"]["items"]
+        totalItems = []
+        for el in elements:
+            print(el["name"] + ' ' + str((el["sum"] + 99) // 100), end='\n')
+            totalItems.append(el["name"] + ' ' + str((el["sum"] + 99) // 100))  # копейки в рубли с округлением вверх
+        totalSum = str((ticket["ticket"]["document"]["receipt"]["totalSum"] + 99) // 100)
+        print(totalSum, end='\n')
+        bot.send_message(message.chat.id, totalSum)
+        client.refresh_token_function()
+
+
+    except:
+        bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
+    os.remove(file_info.file_path)  # удаление изображения с чеком после распознавания
 
 def main():
     # TODO: добавить проверку соединения и тд
