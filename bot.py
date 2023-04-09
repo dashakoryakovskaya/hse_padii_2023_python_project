@@ -193,6 +193,8 @@ def html_to_jpg(chat_id, user_id, type, ex_in, all_period=False, data_start='', 
         print(response.text)
         exit()
     bot.send_photo(chat_id, photo=open(f'files/{chat_id}/image.jpg', 'rb'))
+    os.remove(f'files/{chat_id}/index.html')
+    os.remove(f'files/{chat_id}/image.jpg')
 
 
 def get_data_period(message, user_id, type, ex_in, sum_all):
