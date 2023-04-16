@@ -115,7 +115,7 @@ def stop(message):
 
 def add_expenses_or_incomes_menu(message, user_id, type, ex_in):
     if message.text == "Считать qr код":
-        bot.send_message(message.chat.id, 'Отправь мне фотографию qr кода')
+        bot.send_message(message.chat.id, 'Отправь мне фотографию qr кода', reply_markup=types.ReplyKeyboardRemove())
         bot.register_next_step_handler(message, lambda m: qr_code_reader(message=m, user_id=user_id, type=type))
     elif message.text.isdigit() and int(message.text) >= 0:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -265,7 +265,8 @@ def callback_query(call):
             if (call.data[:len("ex_")] == "ex_"):
                 markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
                 markup.add(types.KeyboardButton("Считать qr код"))
-                mesg = bot.send_message(call.message.chat.id, "💰 Введите сумму или считайте qr код", reply_markup=markup)
+                mesg = bot.send_message(call.message.chat.id, "💰 Введите сумму или считайте qr код",
+                                        reply_markup=markup)
             else:
                 mesg = bot.send_message(call.message.chat.id, "💰 Введите сумму")
             bot.register_next_step_handler(mesg,
@@ -463,29 +464,34 @@ def messages(message):
         bot.register_next_step_handler(message, qr_code_reader)
 
 
-def qr_get_phone(message, qr_code, path, user_id, type):
+def qr_get_phone(message, qr_code, user_id, type):
     # TODO проверить корректность введенного номера и результата запроса
-    url = f'https://{fns.HOST}/v2/auth/phone/request'
-    payload = {
-        'phone': str(message.text),
-        'client_secret': fns.CLIENT_SECRET,
-        'os': fns.OS
-    }
-    print(qr_code)
-    try:
-        resp = requests.post(url, json=payload, headers=fns.headers)
-        print(resp.status_code)
-        if resp.status_code == 429:
-            bot.send_message(message.chat.id, 'Слишком много запросов, попробуйте позже')
-            raise Exception('Слишком много запросов')
-        mesg = bot.send_message(chat_id=message.chat.id, text="Введите код из смс: ")
-        bot.register_next_step_handler(mesg, lambda m: qr_get_code(message=m, phone=message.text, qr_code=qr_code, path=path, user_id=user_id, type=type))
-    except Exception as e:
-        print(e)
-        bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
+    phone = str(message.text)
+    if len(phone) != 12 or phone[0:2] != "+7" or not (phone[2:].isdigit()):
+        mesg = bot.send_message(message.chat.id, "😥 Неправильный формат '+7'\nВведите еще раз:")
+        bot.register_next_step_handler(mesg,
+                                       lambda m: qr_get_phone(message=m, qr_code=qr_code, user_id=user_id,
+                                                              type=type))
+    else:
+        url = f'https://{fns.HOST}/v2/auth/phone/request'
+        payload = {
+            'phone': phone,
+            'client_secret': fns.CLIENT_SECRET,
+            'os': fns.OS
+        }
+        try:
+            resp = requests.post(url, json=payload, headers=fns.headers)
+            if resp.status_code == 429:
+                bot.send_message(message.chat.id, 'Слишком много запросов, попробуйте позже')
+                raise Exception('Слишком много запросов')
+            mesg = bot.send_message(chat_id=message.chat.id, text="Введите код из смс: ")
+            bot.register_next_step_handler(mesg, lambda m: qr_get_code(message=m, phone=message.text, qr_code=qr_code, user_id=user_id, type=type))
+        except Exception as e:
+            print(e)
+            bot.send_message(message.chat.id, 'Возможно qr код не содержит нужную информацию. Попробуйте еще раз :(', reply_markup=menu_key())
 
 
-def qr_get_code(message, phone, qr_code, path, user_id, type):
+def qr_get_code(message, phone, qr_code, user_id, type):
     code = str(message.text)
     url = f'https://{fns.HOST}/v2/auth/phone/verify'
     payload = {
@@ -496,7 +502,8 @@ def qr_get_code(message, phone, qr_code, path, user_id, type):
     }
     resp = requests.post(url, json=payload, headers=fns.headers)
     try:
-        client = FnsAccess(chat_id=message.chat.id, phone=phone, code=code, session_id=resp.json()['sessionId'], refresh_token=resp.json()['refresh_token'])
+        client = FnsAccess(chat_id=message.chat.id, phone=phone, code=code, session_id=resp.json()['sessionId'],
+                           refresh_token=resp.json()['refresh_token'])
         ticket = client.get_ticket(qr_code)
         elements = ticket["ticket"]["document"]["receipt"]["items"]
         totalItems = []
@@ -516,8 +523,10 @@ def qr_get_code(message, phone, qr_code, path, user_id, type):
                                                                 sum=totalSum, ex_in="ex"))
     except Exception as e:
         print(e)
-        bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
-    os.remove(path)  # удаление изображения с чеком после распознавания
+        mesg = bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
+        bot.register_next_step_handler(mesg,
+                                       lambda m: qr_get_code(message=m, phone=phone, qr_code=qr_code,
+                                                             user_id=user_id, type=type))
 
 
 @bot.message_handler(content_types=['photo', 'document'])
@@ -535,15 +544,21 @@ def qr_code_reader(message, user_id, type):
         detector = cv2.QRCodeDetector()
         data, bbox, clear_qr = detector.detectAndDecode(img_qr)
         qr_code = data
+        print(qr_code)
         if qr_code == "":
             bot.send_message(message.chat.id, 'QR код не считан')
             raise Exception('QR код не считан')
         bot.send_message(message.chat.id, 'Успешно!')
-        mesg = bot.send_message(message.chat.id, "Введите номер телефона: ")
-        bot.register_next_step_handler(mesg, lambda m: qr_get_phone(message=m, qr_code=qr_code, path=file_info.file_path, user_id=user_id, type=type))
+        mesg = bot.send_message(message.chat.id, "Введите номер телефона в формате '+7': ")
+        bot.register_next_step_handler(mesg,
+                                       lambda m: qr_get_phone(message=m, qr_code=qr_code,
+                                                              user_id=user_id, type=type))
+        os.remove(file_info.file_path)  # удаление изображения с чеком после распознавания
     except Exception as e:
+        os.remove(file_info.file_path)
         print(e)
         bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
+        bot.register_next_step_handler(message, lambda m: qr_code_reader(message=m, user_id=user_id, type=type))
 
 
 def main():

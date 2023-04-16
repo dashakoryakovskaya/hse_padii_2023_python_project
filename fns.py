@@ -73,7 +73,6 @@ class FnsAccess:
         }
 
         resp = requests.post(url, json=payload, headers=headers)
-        print("_get_ticket_id", resp.status_code)
 
         return resp.json()["id"]
 
@@ -98,7 +97,6 @@ class FnsAccess:
         }
 
         resp = requests.get(url, headers=headers)
-        print("get_ticket", resp.status_code)
 
         return resp.json()
 
