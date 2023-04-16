@@ -1,22 +1,33 @@
 import sqlite3
-from threading import Thread
-import config
-import telebot
 import db
+import config
+
+import telebot
 from telebot import types
 from pathlib import Path
+
+from threading import Thread
+
+import requests
+import json
 
 from datetime import datetime
 import time
 # from notifiers import get_notifier
 import schedule
 
-bot = telebot.TeleBot(config.token)
+import cv2
+import os
+
+from fns import FnsAccess
+import fns
 
 tconv = lambda x: time.strftime("%Y-%m-%d", time.localtime(x))
 tconv_time = lambda x: time.strftime("%H:%M", time.localtime(x))
 
 STOP_BOT_FLAG = False
+
+bot = telebot.TeleBot(config.token)
 
 
 def list_of_tuples_to_str(list_tup: list):
@@ -91,9 +102,8 @@ def category_key(user_id, ex_in, callback):
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
+    bot.clear_step_handler_by_chat_id(chat_id=message.chat.id)
     bot.send_message(message.chat.id, "Привет ✌️ Я - бот для отслеживания твоих финансов!", reply_markup=menu_key())
-    db.add_user(user_id=message.from_user.id, name=message.from_user.first_name)
-    # bot.send_message(message.chat.id, str(threading.current_thread().ident))
 
 
 # TODO: нужна /stop команда?
@@ -104,10 +114,12 @@ def stop(message):
 
 
 def add_expenses_or_incomes_menu(message, user_id, type, ex_in):
-    if message.text.isdigit() and int(message.text) >= 0:
+    if message.text == "Считать qr код":
+        bot.send_message(message.chat.id, 'Отправь мне фотографию qr кода', reply_markup=types.ReplyKeyboardRemove())
+        bot.register_next_step_handler(message, lambda m: qr_code_reader(message=m, user_id=user_id, type=type))
+    elif message.text.isdigit() and int(message.text) >= 0:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn1 = types.KeyboardButton("Текущая дата")
-        markup.add(btn1)
+        markup.add(types.KeyboardButton("Текущая дата"))
         mesg = bot.send_message(message.chat.id, "🗓️ Введите дату в формате YYYY-MM-DD или выберите текущую дату:",
                                 reply_markup=markup)
         bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, type=type,
@@ -230,7 +242,7 @@ def get_rem_time(message, user_id, type, cat, day=-1):
 
 
 def get_rem_text(message, user_id, type, cat, day, time):
-    db.add_reminder(user_id=user_id, time=time+":00", category=cat, date=day, text=message.text, type=type)
+    db.add_reminder(user_id=user_id, time=time + ":00", category=cat, date=day, text=message.text, type=type)
     bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
@@ -250,9 +262,13 @@ def callback_query(call):
 
         if call.data[:len("ex_")] == "ex_" or call.data[:len("in_")] == "in_":
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
-            bot.answer_callback_query(call.id, "Введите сумму")
-            mesg = bot.send_message(call.message.chat.id, "💰 Введите сумму")
-
+            if (call.data[:len("ex_")] == "ex_"):
+                markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+                markup.add(types.KeyboardButton("Считать qr код"))
+                mesg = bot.send_message(call.message.chat.id, "💰 Введите сумму или считайте qr код",
+                                        reply_markup=markup)
+            else:
+                mesg = bot.send_message(call.message.chat.id, "💰 Введите сумму")
             bot.register_next_step_handler(mesg,
                                            lambda m: add_expenses_or_incomes_menu(message=m, user_id=call.from_user.id,
                                                                                   type=call.data[len("ex_"):],
@@ -411,7 +427,8 @@ def callback_query(call):
             list_rem = db.get_all_reminders(user_id=call.from_user.id)
             for l in list_rem:
                 text = db.sql_execute(sql=f"SELECT text FROM reminders_text WHERE id = {l[0]}")[0][0]
-                key.add(types.InlineKeyboardButton(text=text[:20] + ("... " if len(text) > 20 else " ") + l[3][:5] + (" " + str(l[2]) if l[1] == 1 else ""), callback_data="remind_del_" + str(l[0])))
+                key.add(types.InlineKeyboardButton(text=text[:20] + ("... " if len(text) > 20 else " ") + l[3][:5] + (
+                    " " + str(l[2]) if l[1] == 1 else ""), callback_data="remind_del_" + str(l[0])))
             key.add(types.InlineKeyboardButton(text="📌 Меню", callback_data="menu"))
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="Выберите напоминание:",
@@ -423,16 +440,8 @@ def callback_query(call):
             bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
-
 @bot.message_handler(content_types=["text"])
 def messages(message):
-    # bot.send_message(message.chat.id, str(threading.current_thread().ident))
-    '''if message.text[0] == '+':
-        db.add_incomes(user_id=message.from_user.id, name=message.from_user.username, date=message.date,
-                       sum=int(message.text[1:]), type='')
-    if message.text[0] == '-':
-        db.add_expenses(user_id=message.from_user.id, name=message.from_user.username, date=message.date,
-                        sum=int(message.text[1:]), type='') '''
     # вся информация из таблицы по запросу имятаблицы_data
     if message.text[-4:] == 'data':
         bot.send_message(message.chat.id, message.text + ':\n' + list_of_tuples_to_str(db.sql_execute(sql="SELECT * "
@@ -443,13 +452,113 @@ def messages(message):
         bot.send_message(message.chat.id, 'Баланс:' + '\n' + one_tuple_to_str(
             db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={message.from_user.id};")))
 
-    #
-
     if message.text == 'add notification':
         db.add_reminder(user_id=message.chat.id, date=11, time='20:17:00', type=1, text='Срочно оплати')
 
     if message.text == 'delete notification':
-        db.erase_reminder(notification_id=1)
+        bot.send_message(message.chat.id, 'balance' + ':\n' + one_tuple_to_str(
+            db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={message.from_user.id};")))
+    if message.text[0:2] == 'qr':
+        bot.send_message(message.chat.id,
+                         'Отправь мне фотографию qr кода')  # TODO: добавить отправление не картинкой, а файлом
+        bot.register_next_step_handler(message, qr_code_reader)
+
+
+def qr_get_phone(message, qr_code, user_id, type):
+    # TODO проверить корректность введенного номера и результата запроса
+    phone = str(message.text)
+    if len(phone) != 12 or phone[0:2] != "+7" or not (phone[2:].isdigit()):
+        mesg = bot.send_message(message.chat.id, "😥 Неправильный формат '+7'\nВведите еще раз:")
+        bot.register_next_step_handler(mesg,
+                                       lambda m: qr_get_phone(message=m, qr_code=qr_code, user_id=user_id,
+                                                              type=type))
+    else:
+        url = f'https://{fns.HOST}/v2/auth/phone/request'
+        payload = {
+            'phone': phone,
+            'client_secret': fns.CLIENT_SECRET,
+            'os': fns.OS
+        }
+        try:
+            resp = requests.post(url, json=payload, headers=fns.headers)
+            if resp.status_code == 429:
+                bot.send_message(message.chat.id, 'Слишком много запросов, попробуйте позже')
+                raise Exception('Слишком много запросов')
+            mesg = bot.send_message(chat_id=message.chat.id, text="Введите код из смс: ")
+            bot.register_next_step_handler(mesg, lambda m: qr_get_code(message=m, phone=message.text, qr_code=qr_code, user_id=user_id, type=type))
+        except Exception as e:
+            print(e)
+            bot.send_message(message.chat.id, 'Возможно qr код не содержит нужную информацию. Попробуйте еще раз :(', reply_markup=menu_key())
+
+
+def qr_get_code(message, phone, qr_code, user_id, type):
+    code = str(message.text)
+    url = f'https://{fns.HOST}/v2/auth/phone/verify'
+    payload = {
+        'phone': phone,
+        'client_secret': fns.CLIENT_SECRET,
+        'code': code,
+        "os": fns.OS
+    }
+    resp = requests.post(url, json=payload, headers=fns.headers)
+    try:
+        client = FnsAccess(chat_id=message.chat.id, phone=phone, code=code, session_id=resp.json()['sessionId'],
+                           refresh_token=resp.json()['refresh_token'])
+        ticket = client.get_ticket(qr_code)
+        elements = ticket["ticket"]["document"]["receipt"]["items"]
+        totalItems = []
+        for el in elements:
+            print(el["name"] + ' ' + str((el["sum"] + 99) // 100), end='\n')
+            totalItems.append(
+                el["name"] + ' ' + str((el["sum"] + 99) // 100))  # копейки в рубли с округлением вверх
+        totalSum = str((ticket["ticket"]["document"]["receipt"]["totalSum"] + 99) // 100)
+        print(totalSum, end='\n')
+        bot.send_message(message.chat.id, totalSum)
+        client.refresh_token_function()
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add(types.KeyboardButton("Текущая дата"))
+        mesg = bot.send_message(message.chat.id, "🗓️ Введите дату в формате YYYY-MM-DD или выберите текущую дату:",
+                                reply_markup=markup)
+        bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, type=type,
+                                                                sum=totalSum, ex_in="ex"))
+    except Exception as e:
+        print(e)
+        mesg = bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
+        bot.register_next_step_handler(mesg,
+                                       lambda m: qr_get_code(message=m, phone=phone, qr_code=qr_code,
+                                                             user_id=user_id, type=type))
+
+
+@bot.message_handler(content_types=['photo', 'document'])
+def qr_code_reader(message, user_id, type):
+    Path('photos').mkdir(parents=True, exist_ok=True)
+    file_info = bot.get_file(message.photo[len(message.photo) - 1].file_id)
+    downloaded_file = bot.download_file(file_info.file_path)
+    src = file_info.file_path
+
+    with open(src, 'wb') as new_file:
+        new_file.write(downloaded_file)
+
+    try:
+        img_qr = cv2.imread(src)
+        detector = cv2.QRCodeDetector()
+        data, bbox, clear_qr = detector.detectAndDecode(img_qr)
+        qr_code = data
+        print(qr_code)
+        if qr_code == "":
+            bot.send_message(message.chat.id, 'QR код не считан')
+            raise Exception('QR код не считан')
+        bot.send_message(message.chat.id, 'Успешно!')
+        mesg = bot.send_message(message.chat.id, "Введите номер телефона в формате '+7': ")
+        bot.register_next_step_handler(mesg,
+                                       lambda m: qr_get_phone(message=m, qr_code=qr_code,
+                                                              user_id=user_id, type=type))
+        os.remove(file_info.file_path)  # удаление изображения с чеком после распознавания
+    except Exception as e:
+        os.remove(file_info.file_path)
+        print(e)
+        bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
+        bot.register_next_step_handler(message, lambda m: qr_code_reader(message=m, user_id=user_id, type=type))
 
 
 def main():
