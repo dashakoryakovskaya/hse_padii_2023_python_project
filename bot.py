@@ -1,11 +1,15 @@
 import sqlite3
-from threading import Thread
-import config
-import telebot
 import db
+import config
+
+import telebot
 from telebot import types
 from pathlib import Path
+
+from threading import Thread
+
 import requests
+import json
 
 from datetime import datetime
 import time
@@ -14,7 +18,6 @@ import schedule
 
 import cv2
 import os
-import json
 
 from fns import FnsAccess
 import fns
@@ -111,10 +114,12 @@ def stop(message):
 
 
 def add_expenses_or_incomes_menu(message, user_id, type, ex_in):
-    if message.text.isdigit() and int(message.text) >= 0:
+    if message.text == "Считать qr код":
+        bot.send_message(message.chat.id, 'Отправь мне фотографию qr кода')
+        bot.register_next_step_handler(message, lambda m: qr_code_reader(message=m, user_id=user_id, type=type))
+    elif message.text.isdigit() and int(message.text) >= 0:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn1 = types.KeyboardButton("Текущая дата")
-        markup.add(btn1)
+        markup.add(types.KeyboardButton("Текущая дата"))
         mesg = bot.send_message(message.chat.id, "🗓️ Введите дату в формате YYYY-MM-DD или выберите текущую дату:",
                                 reply_markup=markup)
         bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, type=type,
@@ -257,9 +262,12 @@ def callback_query(call):
 
         if call.data[:len("ex_")] == "ex_" or call.data[:len("in_")] == "in_":
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
-            bot.answer_callback_query(call.id, "Введите сумму")
-            mesg = bot.send_message(call.message.chat.id, "💰 Введите сумму")
-
+            if (call.data[:len("ex_")] == "ex_"):
+                markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+                markup.add(types.KeyboardButton("Считать qr код"))
+                mesg = bot.send_message(call.message.chat.id, "💰 Введите сумму или считайте qr код", reply_markup=markup)
+            else:
+                mesg = bot.send_message(call.message.chat.id, "💰 Введите сумму")
             bot.register_next_step_handler(mesg,
                                            lambda m: add_expenses_or_incomes_menu(message=m, user_id=call.from_user.id,
                                                                                   type=call.data[len("ex_"):],
@@ -455,7 +463,7 @@ def messages(message):
         bot.register_next_step_handler(message, qr_code_reader)
 
 
-def qr_get_phone(message, qr_code, path):
+def qr_get_phone(message, qr_code, path, user_id, type):
     # TODO проверить корректность введенного номера и результата запроса
     url = f'https://{fns.HOST}/v2/auth/phone/request'
     payload = {
@@ -463,19 +471,21 @@ def qr_get_phone(message, qr_code, path):
         'client_secret': fns.CLIENT_SECRET,
         'os': fns.OS
     }
+    print(qr_code)
     try:
         resp = requests.post(url, json=payload, headers=fns.headers)
+        print(resp.status_code)
         if resp.status_code == 429:
             bot.send_message(message.chat.id, 'Слишком много запросов, попробуйте позже')
             raise Exception('Слишком много запросов')
         mesg = bot.send_message(chat_id=message.chat.id, text="Введите код из смс: ")
-        bot.register_next_step_handler(mesg, lambda m: qr_get_code(message=m, phone=message.text, qr_code=qr_code, path=path))
+        bot.register_next_step_handler(mesg, lambda m: qr_get_code(message=m, phone=message.text, qr_code=qr_code, path=path, user_id=user_id, type=type))
     except Exception as e:
         print(e)
         bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
 
 
-def qr_get_code(message, phone, qr_code, path):
+def qr_get_code(message, phone, qr_code, path, user_id, type):
     code = str(message.text)
     url = f'https://{fns.HOST}/v2/auth/phone/verify'
     payload = {
@@ -498,6 +508,12 @@ def qr_get_code(message, phone, qr_code, path):
         print(totalSum, end='\n')
         bot.send_message(message.chat.id, totalSum)
         client.refresh_token_function()
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add(types.KeyboardButton("Текущая дата"))
+        mesg = bot.send_message(message.chat.id, "🗓️ Введите дату в формате YYYY-MM-DD или выберите текущую дату:",
+                                reply_markup=markup)
+        bot.register_next_step_handler(mesg, lambda m: add_date(message=m, user_id=user_id, type=type,
+                                                                sum=totalSum, ex_in="ex"))
     except Exception as e:
         print(e)
         bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
@@ -505,7 +521,7 @@ def qr_get_code(message, phone, qr_code, path):
 
 
 @bot.message_handler(content_types=['photo', 'document'])
-def qr_code_reader(message):
+def qr_code_reader(message, user_id, type):
     Path('photos').mkdir(parents=True, exist_ok=True)
     file_info = bot.get_file(message.photo[len(message.photo) - 1].file_id)
     downloaded_file = bot.download_file(file_info.file_path)
@@ -524,7 +540,7 @@ def qr_code_reader(message):
             raise Exception('QR код не считан')
         bot.send_message(message.chat.id, 'Успешно!')
         mesg = bot.send_message(message.chat.id, "Введите номер телефона: ")
-        bot.register_next_step_handler(mesg, lambda m: qr_get_phone(message=m, qr_code=qr_code, path=file_info.file_path))
+        bot.register_next_step_handler(mesg, lambda m: qr_get_phone(message=m, qr_code=qr_code, path=file_info.file_path, user_id=user_id, type=type))
     except Exception as e:
         print(e)
         bot.send_message(message.chat.id, 'Попробуйте еще раз :(')

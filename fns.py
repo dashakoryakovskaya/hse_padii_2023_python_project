@@ -2,8 +2,6 @@ import json
 
 import requests
 
-import bot
-
 HOST = 'irkkt-mobile.nalog.ru:8888'
 DEVICE_OS = 'iOS'
 CLIENT_VERSION = '2.9.0'
@@ -42,62 +40,12 @@ class FnsAccess:
         self.__chat_id = chat_id
         self.__session_id = session_id
         self.__refresh_token = refresh_token
-        # self.set_session_id()
-
-    def set_session_id(self) -> None:
-        """
-        Authorization using phone and SMS code
-        """
-        '''self.__phone = input('Input phone number: ')
-
-        url = f'https://{self.HOST}/v2/auth/phone/request'
-        payload = {
-            'phone': self.__phone,
-            'client_secret': self.CLIENT_SECRET,
-            'os': self.OS
-        }
-        headers = {
-            'Host': self.HOST,
-            'Accept': self.ACCEPT,
-            'Device-OS': self.DEVICE_OS,
-            'Device-Id': self.DEVICE_ID,
-            'clientVersion': self.CLIENT_VERSION,
-            'Accept-Language': self.ACCEPT_LANGUAGE,
-            'User-Agent': self.USER_AGENT,
-        }
-
-        resp = requests.post(url, json=payload, headers=headers)
-
-        self.__code = input('Input code: ')
-
-        url = f'https://{self.HOST}/v2/auth/phone/verify'
-        payload = {
-            'phone': self.__phone,
-            'client_secret': self.CLIENT_SECRET,
-            'code': self.__code,
-            "os": self.OS
-        }
-
-        resp = requests.post(url, json=payload, headers=headers) '''
-
-        '''self.__session_id = resp.json()['sessionId']
-        self.__refresh_token = resp.json()['refresh_token']'''
 
     def refresh_token_function(self) -> None:
         url = f'https://{self.HOST}/v2/mobile/users/refresh'
         payload = {
             'refresh_token': self.__refresh_token,
             'client_secret': self.CLIENT_SECRET
-        }
-
-        headers = {
-            'Host': self.HOST,
-            'Accept': self.ACCEPT,
-            'Device-OS': self.DEVICE_OS,
-            'Device-Id': self.DEVICE_ID,
-            'clientVersion': self.CLIENT_VERSION,
-            'Accept-Language': self.ACCEPT_LANGUAGE,
-            'User-Agent': self.USER_AGENT,
         }
 
         resp = requests.post(url, json=payload, headers=headers)
