@@ -2,6 +2,27 @@ import json
 
 import requests
 
+import bot
+
+HOST = 'irkkt-mobile.nalog.ru:8888'
+DEVICE_OS = 'iOS'
+CLIENT_VERSION = '2.9.0'
+DEVICE_ID = '7C82010F-16CC-446B-8F66-FC4080C66521'
+ACCEPT = '*/*'
+USER_AGENT = 'billchecker/2.9.0 (iPhone; iOS 13.6; Scale/2.00)'
+ACCEPT_LANGUAGE = 'ru-RU;q=1, en-US;q=0.9'
+CLIENT_SECRET = 'IyvrAbKt9h/8p6a7QPh8gpkXYQ4='
+OS = 'Android'
+headers = {
+        'Host': HOST,
+        'Accept': ACCEPT,
+        'Device-OS': DEVICE_OS,
+        'Device-Id': DEVICE_ID,
+        'clientVersion': CLIENT_VERSION,
+        'Accept-Language': ACCEPT_LANGUAGE,
+        'User-Agent': USER_AGENT,
+    }
+
 
 class FnsAccess:
     HOST = 'irkkt-mobile.nalog.ru:8888'
@@ -14,15 +35,20 @@ class FnsAccess:
     CLIENT_SECRET = 'IyvrAbKt9h/8p6a7QPh8gpkXYQ4='
     OS = 'Android'
 
-    def __init__(self):
+    def __init__(self, chat_id, phone, code, session_id, refresh_token):
         self.__session_id = None
-        self.set_session_id()
+        self.__phone = phone
+        self.__code = code
+        self.__chat_id = chat_id
+        self.__session_id = session_id
+        self.__refresh_token = refresh_token
+        # self.set_session_id()
 
     def set_session_id(self) -> None:
         """
         Authorization using phone and SMS code
         """
-        self.__phone = input('Input phone number: ')
+        '''self.__phone = input('Input phone number: ')
 
         url = f'https://{self.HOST}/v2/auth/phone/request'
         payload = {
@@ -52,10 +78,10 @@ class FnsAccess:
             "os": self.OS
         }
 
-        resp = requests.post(url, json=payload, headers=headers)
+        resp = requests.post(url, json=payload, headers=headers) '''
 
-        self.__session_id = resp.json()['sessionId']
-        self.__refresh_token = resp.json()['refresh_token']
+        '''self.__session_id = resp.json()['sessionId']
+        self.__refresh_token = resp.json()['refresh_token']'''
 
     def refresh_token_function(self) -> None:
         url = f'https://{self.HOST}/v2/mobile/users/refresh'
@@ -99,6 +125,7 @@ class FnsAccess:
         }
 
         resp = requests.post(url, json=payload, headers=headers)
+        print("_get_ticket_id", resp.status_code)
 
         return resp.json()["id"]
 
@@ -123,11 +150,12 @@ class FnsAccess:
         }
 
         resp = requests.get(url, headers=headers)
+        print("get_ticket", resp.status_code)
 
         return resp.json()
 
 
-if __name__ == '__main__':
+'''if __name__ == '__main__':
     client = FnsAccess()
     qr_code = "t=20230318T1501&s=229.98&fn=9960440502975708&i=13772&fp=4215413791&n=1"  # test receipt
     ticket = client.get_ticket(qr_code)
@@ -142,4 +170,4 @@ if __name__ == '__main__':
     totalSum = str((ticket["ticket"]["document"]["receipt"]["totalSum"] + 99) // 100)
     print(totalSum, end='\n')
 
-    # client.refresh_token_function()
+    # client.refresh_token_function() '''

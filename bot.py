@@ -5,25 +5,27 @@ import telebot
 import db
 from telebot import types
 from pathlib import Path
+import requests
 
 from datetime import datetime
 import time
 # from notifiers import get_notifier
 import schedule
 
+import cv2
+import os
+import json
+
+from fns import FnsAccess
+import fns
+
 tconv = lambda x: time.strftime("%Y-%m-%d", time.localtime(x))
 tconv_time = lambda x: time.strftime("%H:%M", time.localtime(x))
 
 STOP_BOT_FLAG = False
 
-#new branch
-
-import cv2
-import os
-
-from fns import FnsAccess
-
 bot = telebot.TeleBot(config.token)
+
 
 def list_of_tuples_to_str(list_tup: list):
     string = ''
@@ -97,6 +99,7 @@ def category_key(user_id, ex_in, callback):
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
+    bot.clear_step_handler_by_chat_id(chat_id=message.chat.id)
     bot.send_message(message.chat.id, "Привет ✌️ Я - бот для отслеживания твоих финансов!", reply_markup=menu_key())
 
 
@@ -234,7 +237,7 @@ def get_rem_time(message, user_id, type, cat, day=-1):
 
 
 def get_rem_text(message, user_id, type, cat, day, time):
-    db.add_reminder(user_id=user_id, time=time+":00", category=cat, date=day, text=message.text, type=type)
+    db.add_reminder(user_id=user_id, time=time + ":00", category=cat, date=day, text=message.text, type=type)
     bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
@@ -415,7 +418,8 @@ def callback_query(call):
             list_rem = db.get_all_reminders(user_id=call.from_user.id)
             for l in list_rem:
                 text = db.sql_execute(sql=f"SELECT text FROM reminders_text WHERE id = {l[0]}")[0][0]
-                key.add(types.InlineKeyboardButton(text=text[:20] + ("... " if len(text) > 20 else " ") + l[3][:5] + (" " + str(l[2]) if l[1] == 1 else ""), callback_data="remind_del_" + str(l[0])))
+                key.add(types.InlineKeyboardButton(text=text[:20] + ("... " if len(text) > 20 else " ") + l[3][:5] + (
+                    " " + str(l[2]) if l[1] == 1 else ""), callback_data="remind_del_" + str(l[0])))
             key.add(types.InlineKeyboardButton(text="📌 Меню", callback_data="menu"))
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="Выберите напоминание:",
@@ -425,7 +429,6 @@ def callback_query(call):
             bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             db.erase_reminder(notification_id=int(call.data[len("remind_del_"):]))
             bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
-
 
 
 @bot.message_handler(content_types=["text"])
@@ -452,8 +455,70 @@ def messages(message):
         bot.register_next_step_handler(message, qr_code_reader)
 
 
+def phone(message, qr_code, path):
+    print("Hi", message.text)
+    # TODO проверить корректность введенного номера и результата запроса
+    url = f'https://{fns.HOST}/v2/auth/phone/request'
+    payload = {
+        'phone': str(message.text),
+        'client_secret': fns.CLIENT_SECRET,
+        'os': fns.OS
+    }
+    print(url)
+    print(fns.CLIENT_SECRET)
+    print(fns.headers)
+    try:
+        resp = requests.post(url, json=payload, headers=fns.headers)
+        print(resp.status_code)
+
+        mesg = bot.send_message(chat_id=message.chat.id, text="Введите код из смс: ")
+        bot.register_next_step_handler(mesg, lambda m: code(message=m, phone=message.text, qr_code=qr_code, path=path))
+    except Exception as e:
+        print(e)
+        bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
+
+
+def code(message, phone, qr_code, path):
+    code = str(message.text)
+    url = f'https://{fns.HOST}/v2/auth/phone/verify'
+    payload = {
+        'phone': phone,
+        'client_secret': fns.CLIENT_SECRET,
+        'code': code,
+        "os": fns.OS
+    }
+    resp = requests.post(url, json=payload, headers=fns.headers)
+    print("code ", code)
+    print(resp.status_code)
+    print(resp.json()['sessionId'])
+    try:
+        client = FnsAccess(chat_id=message.chat.id, phone=phone, code=code, session_id=resp.json()['sessionId'], refresh_token=resp.json()['refresh_token'])
+        print("tut1")
+        print(qr_code)
+        ticket = client.get_ticket(qr_code)
+        print("tut2")
+
+        elements = ticket["ticket"]["document"]["receipt"]["items"]
+        print("tut3")
+        totalItems = []
+        for el in elements:
+            print(el["name"] + ' ' + str((el["sum"] + 99) // 100), end='\n')
+            totalItems.append(
+                el["name"] + ' ' + str((el["sum"] + 99) // 100))  # копейки в рубли с округлением вверх
+        totalSum = str((ticket["ticket"]["document"]["receipt"]["totalSum"] + 99) // 100)
+        print(totalSum, end='\n')
+        print("tut4")
+        bot.send_message(message.chat.id, totalSum)
+        client.refresh_token_function()
+    except Exception as e:
+        print(e)
+        bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
+    os.remove(path)  # удаление изображения с чеком после распознавания
+
+
 @bot.message_handler(content_types=['photo', 'document'])
 def qr_code_reader(message):
+    Path('photos').mkdir(parents=True, exist_ok=True)
     file_info = bot.get_file(message.photo[len(message.photo) - 1].file_id)
     downloaded_file = bot.download_file(file_info.file_path)
     src = file_info.file_path
@@ -462,13 +527,22 @@ def qr_code_reader(message):
         new_file.write(downloaded_file)
 
     try:
+        print(src)
         img_qr = cv2.imread(src)
         detector = cv2.QRCodeDetector()
         data, bbox, clear_qr = detector.detectAndDecode(img_qr)
         qr_code = data
+        print(qr_code)
+        print(type(qr_code))
+        if qr_code == "":
+            bot.send_message(message.chat.id, 'QR код не считан')
+            raise Exception('QR код не считан')
         bot.send_message(message.chat.id, 'Успешно!')
-
-        client = FnsAccess()
+        mesg = bot.send_message(message.chat.id, "Введите номер телефона: ")
+        bot.register_next_step_handler(mesg, lambda m: phone(message=m, qr_code=qr_code, path=file_info.file_path))
+        '''print("After phone and code")
+        client = FnsAccess(chat_id=message.chat.id)
+        print("After client")
         ticket = client.get_ticket(qr_code)
 
         elements = ticket["ticket"]["document"]["receipt"]["items"]
@@ -479,10 +553,12 @@ def qr_code_reader(message):
         totalSum = str((ticket["ticket"]["document"]["receipt"]["totalSum"] + 99) // 100)
         print(totalSum, end='\n')
         bot.send_message(message.chat.id, totalSum)
-        client.refresh_token_function()
-    except:
+        client.refresh_token_function() '''
+    except Exception as e:
+        print(e)
         bot.send_message(message.chat.id, 'Попробуйте еще раз :(')
-    os.remove(file_info.file_path)  # удаление изображения с чеком после распознавания
+    # os.remove(file_info.file_path)  # удаление изображения с чеком после распознавания
+
 
 def main():
     # TODO: добавить проверку соединения и тд
