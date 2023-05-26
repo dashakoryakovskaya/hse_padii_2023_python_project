@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 
 import catboost as cb
+from lightautoml.automl.presets.tabular_presets import TabularUtilizedAutoML
+from lightautoml.tasks import Task
 import torch
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -12,7 +14,6 @@ from sklearn.metrics import mean_squared_error
 import optuna
 import pickle
 import os
-from pathlib import Path
 
 
 def prepoc(df):
@@ -64,7 +65,7 @@ EARLY_STOPPING_ROUND = 100
 CAT_COLUMNS = ['day', 'month', 'day_of_week', 'is_weekend', 'is_winter', 'is_spring', 'is_summer', 'is_autumn']
 
 
-def catboost(user_id, df, new_df):
+def catboost(df, new_df):
     ft = prepoc(df)
     X_train, X_valid, y_train, y_valid = train_test_split(ft[['date']], ft['sum'], test_size=0.2,
                                                               shuffle=False)
@@ -144,4 +145,39 @@ def catboost_predict(df, user_id):
             # preds = np.mean([model.predict(good_df) for model in models], axis=0)
             res[target] = preds
     return pd.DataFrame(res)
+
+
+# параметры для lama
+N_THREADS = 40
+N_FOLDS = 3
+RANDOM_STATE = 56
+TEST_SIZE = 0.2
+TIMEOUT = 10
+
+
+np.random.seed(RANDOM_STATE)
+torch.set_num_threads(N_THREADS)
+
+task = Task('reg')
+
+
+def lama(df, new_df):
+    train = prepoc(df)
+    train = make_features(train)
+
+    TARGET_NAME = 'sum'
+    roles = {
+        'target': TARGET_NAME,
+    }
+    automl = TabularUtilizedAutoML(
+        task=task,
+        timeout=TIMEOUT,
+        cpu_limit=N_THREADS,
+        reader_params={'n_jobs': N_THREADS, 'cv': N_FOLDS, 'random_state': RANDOM_STATE})
+    oof_pred = automl.fit_predict(train, roles=roles, verbose=False)
+    new_df = make_features(prepoc_new(new_df))
+    res = automl.predict(new_df)
+    df = pd.DataFrame(res.data[:, 0], columns=['sum'])
+    df['date'] = new_df['date']
+    return df
 

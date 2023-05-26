@@ -257,14 +257,38 @@ def get_pred_day(message, user_id, model):
     else:
         if model == "catboost":
             df = pd.DataFrame(db.get_df(user_id=user_id), columns=['date', 'sum'])
+
             if 0.08 * df.shape[0] < 1:
                 bot.send_message(message.chat.id, "Слишком мало информации о расходах :(")
                 bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
                 return
+
             str_start_date = pd.Timestamp(message.date, unit='s', tz='US/Pacific').strftime('%Y-%m-%d')
             pd_dates = pd.DataFrame(pd.date_range(str_start_date, freq=datetime.timedelta(seconds=86400), periods=int(message.text)))
             pd_dates.columns = ['date']
-            res = predict.catboost(user_id=message.chat.id, df=df, new_df=pd_dates)
+
+            res = predict.catboost(df=df, new_df=pd_dates)
+
+            file = open(f"files/{message.chat.id}/pred.txt", "w")
+            for i, row in res.iterrows():
+                file.write(f'{row["date"].date().strftime("%d-%m-%Y")} | {round(row["sum"], 3)}\n')
+            file.close()
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/pred.txt", "r"))
+            os.remove(f"files/{message.chat.id}/pred.txt")
+
+            plt.scatter(res['date'], res['sum'], c="red", linestyle="dotted")
+            plt.savefig(f"files/{message.chat.id}/image.jpg")
+            plt.clf()
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            os.remove(f"files/{message.chat.id}/image.jpg")
+        elif model == "lama":
+            df = pd.DataFrame(db.get_df(user_id=user_id), columns=['date', 'sum'])
+            str_start_date = pd.Timestamp(message.date, unit='s', tz='US/Pacific').strftime('%Y-%m-%d')
+            pd_dates = pd.DataFrame(
+                pd.date_range(str_start_date, freq=datetime.timedelta(seconds=86400), periods=int(message.text)))
+            pd_dates.columns = ['date']
+            res = predict.lama(df=df, new_df=pd_dates)
+
             file = open(f"files/{message.chat.id}/pred.txt", "w")
             for i, row in res.iterrows():
                 file.write(f'{row["date"].date().strftime("%d-%m-%Y")} | {round(row["sum"], 3)}\n')
