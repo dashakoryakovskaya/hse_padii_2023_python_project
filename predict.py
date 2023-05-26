@@ -98,7 +98,7 @@ def catboost(user_id, df, new_df):
         loss = mean_squared_error(y_valid, regressor.predict(X_valid.copy()))
         return loss
     study = optuna.create_study(study_name=f'catboost-seed{RANDOM_SEED}')
-    study.optimize(objective, n_trials=10, n_jobs=-1, timeout=24000, show_progress_bar=True) # TODO поменять n_trials
+    study.optimize(objective, n_trials=100, n_jobs=-1, timeout=24000, show_progress_bar=True)
 
     optimized_regressor = cb.CatBoostRegressor(learning_rate=study.best_params['learning_rate'],
                                             depth=study.best_params['depth'],
