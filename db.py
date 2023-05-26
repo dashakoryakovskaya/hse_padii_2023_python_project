@@ -385,6 +385,13 @@ def get_cards(conn, user_id: int):
 
 
 @ensure_connection
+def get_df(conn, user_id: int):
+    c = conn.cursor()
+    c.execute(f'SELECT date, sum FROM expenses WHERE user_id={user_id};')
+    res = c.fetchall()
+    return res
+
+@ensure_connection
 def sql_execute(conn, sql):
     # conn = get_connection()
     c = conn.cursor()

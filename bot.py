@@ -1,6 +1,7 @@
 import sqlite3
 import db
 import config
+import predict
 
 import telebot
 from telebot import types
@@ -11,7 +12,7 @@ from threading import Thread
 import requests
 import json
 
-from datetime import datetime
+import datetime
 import time
 # from notifiers import get_notifier
 import schedule
@@ -21,6 +22,9 @@ import os
 
 from fns import FnsAccess
 import fns
+
+import pandas as pd
+import matplotlib.pyplot as plt
 
 tconv = lambda x: time.strftime("%Y-%m-%d", time.localtime(x))
 tconv_time = lambda x: time.strftime("%H:%M", time.localtime(x))
@@ -87,7 +91,8 @@ def menu_key():
     but_3 = types.InlineKeyboardButton(text="📃 Статистика", callback_data="data")
     but_4 = types.InlineKeyboardButton(text="✔️ Дисконтные карты", callback_data="cards")
     but_5 = types.InlineKeyboardButton(text="🔔 Напоминания", callback_data="remind")
-    key.add(but_1, but_2, but_3, but_4, but_5)
+    but_6 = types.InlineKeyboardButton(text="Предсказания расходов", callback_data="predict")
+    key.add(but_1, but_2, but_3, but_4, but_5, but_6)
     return key
 
 
@@ -104,6 +109,7 @@ def category_key(user_id, ex_in, callback):
 def start_message(message):
     bot.clear_step_handler_by_chat_id(chat_id=message.chat.id)
     bot.send_message(message.chat.id, "Привет ✌️ Я - бот для отслеживания твоих финансов!", reply_markup=menu_key())
+    db.add_user(user_id=message.from_user.id, name=message.from_user.username)
 
 
 # TODO: нужна /stop команда?
@@ -218,8 +224,7 @@ def get_rem_data(message, user_id, type, cat):
                                                               cat=cat, day=int(message.text)))
     else:
         mesg = bot.send_message(message.chat.id, "😥 Неправильный формат день от 1 до 31\nВведите еще раз:")
-        bot.register_next_step_handler(mesg,
-                                       lambda m: get_rem_data(message=m, user_id=user_id, type=type, cat=cat))
+        bot.register_next_step_handler(mesg, lambda m: get_rem_data(message=m, user_id=user_id, type=type, cat=cat))
 
 
 def is_incorrect_time_format(string):
@@ -231,8 +236,7 @@ def is_incorrect_time_format(string):
 def get_rem_time(message, user_id, type, cat, day=-1):
     if message.text != "Текущее время" and is_incorrect_time_format(message.text):
         mesg = bot.send_message(message.chat.id, "😥 Неправильный формат HH:MM\nВведите еще раз:")
-        bot.register_next_step_handler(mesg,
-                                       lambda m: get_rem_time(message=m, user_id=user_id, type=type, cat=cat, day=day))
+        bot.register_next_step_handler(mesg, lambda m: get_rem_time(message=m, user_id=user_id, type=type, cat=cat, day=day))
     else:
         mesg = bot.send_message(message.chat.id, "Введите текст:", reply_markup=types.ReplyKeyboardRemove())
         time = message.text if message.text != "Текущее время" else tconv_time(message.date)
@@ -246,22 +250,50 @@ def get_rem_text(message, user_id, type, cat, day, time):
     bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
+def get_pred_day(message, user_id, model):
+    if not(message.text.isdigit()) or int(message.text) < 0:
+        mesg = bot.send_message(message.chat.id, "😥 Неправильный формат\nВведите еще раз:")
+        bot.register_next_step_handler(mesg, lambda m: get_pred_day(message=m, user_id=user_id, model=model))
+    else:
+        if model == "catboost":
+            df = pd.DataFrame(db.get_df(user_id=user_id), columns=['date', 'sum'])
+            if 0.08 * df.shape[0] < 1:
+                bot.send_message(message.chat.id, "Слишком мало информации о расходах :(")
+                bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
+                return
+            str_start_date = pd.Timestamp(message.date, unit='s', tz='US/Pacific').strftime('%Y-%m-%d')
+            pd_dates = pd.DataFrame(pd.date_range(str_start_date, freq=datetime.timedelta(seconds=86400), periods=int(message.text)))
+            pd_dates.columns = ['date']
+            res = predict.catboost(user_id=message.chat.id, df=df, new_df=pd_dates)
+            file = open(f"files/{message.chat.id}/pred.txt", "w")
+            for i, row in res.iterrows():
+                file.write(f'{row["date"].date().strftime("%d-%m-%Y")} | {round(row["sum"], 3)}\n')
+            file.close()
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/pred.txt", "r"))
+            os.remove(f"files/{message.chat.id}/pred.txt")
+
+            plt.scatter(res['date'], res['sum'], c="red", linestyle="dotted")
+            plt.savefig(f"files/{message.chat.id}/image.jpg")
+            plt.clf()
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            os.remove(f"files/{message.chat.id}/image.jpg")
+
+        bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     if call.message:
+        bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
         if call.data == "menu":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="📌 Меню",
                                   reply_markup=menu_key())
         if call.data == "ex" or call.data == "in":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="📎 Выберите категорию:",
                                   reply_markup=category_key(user_id=call.from_user.id, ex_in=call.data,
                                                             callback=call.data + "_"))
 
         if call.data[:len("ex_")] == "ex_" or call.data[:len("in_")] == "in_":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             if (call.data[:len("ex_")] == "ex_"):
                 markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
                 markup.add(types.KeyboardButton("Считать qr код"))
@@ -275,7 +307,6 @@ def callback_query(call):
                                                                                   ex_in=call.data[:2]))
 
         if call.data == "data":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             # TODO: Продумать статистику для доходов и расходов (период, категории и тд)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="💰 Баланс", callback_data="data_balance")
@@ -289,13 +320,11 @@ def callback_query(call):
 
         # data_ex_numcat_all
         if call.data == "data_balance":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             bot.send_message(call.message.chat.id, 'Баланс:' + '\n' + one_tuple_to_str(
                 db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={call.from_user.id};")))
             bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
         if call.data == "data_ex" or call.data == "data_in":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="📎 Выберите категорию:",
                                   reply_markup=category_key(user_id=call.from_user.id, ex_in=call.data[5:],
@@ -305,7 +334,6 @@ def callback_query(call):
 
         if call.data.count("_") == 2 and (
                 call.data[:len("data_ex_")] == "data_ex_" or call.data[:len("data_in_")] == "data_in_"):
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="💰 Сумма", callback_data=call.data + "_sum")
             but_2 = types.InlineKeyboardButton(text="📃 Все операции", callback_data=call.data + "_all")
@@ -318,7 +346,6 @@ def callback_query(call):
         if call.data.count("_") == 3 and (
                 call.data[:len("data_ex_")] == "data_ex_" or call.data[:len("data_in_")] == "data_in_") and (
                 call.data[-4:] == "_sum" or call.data[-4:] == "_all"):
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             bot.answer_callback_query(call.id, "Введите период")
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
             btn1 = types.KeyboardButton("Весь период")
@@ -336,7 +363,6 @@ def callback_query(call):
                                                                      ex_in=call.data[5:7], sum_all=call.data[-3:]))
 
         if call.data == "cards":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="📃 Получить карту", callback_data="cards_get")
             but_2 = types.InlineKeyboardButton(text="✅ Добавить карту", callback_data="cards_add")
@@ -347,12 +373,10 @@ def callback_query(call):
                                   reply_markup=key)
 
         if call.data == "cards_add":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             mesg = bot.send_message(call.message.chat.id, "✔️ Введите название")
             bot.register_next_step_handler(mesg, lambda m: get_card_name(message=m, user_id=call.from_user.id, name=""))
 
         if call.data == "cards_get":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
             for line in db.get_cards(user_id=call.from_user.id):
                 key.add(types.InlineKeyboardButton(text=line[0], callback_data="cards_get_" + line[0]))
@@ -362,7 +386,6 @@ def callback_query(call):
                                   reply_markup=key)
 
         if len(call.data) >= len("cards_get_") and call.data[:len("cards_get_")] == "cards_get_":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             for line in db.get_cards(user_id=call.from_user.id):
                 if line[0] == call.data[len("cards_get_"):]:
                     bot.send_photo(chat_id=call.message.chat.id, photo=line[1])
@@ -373,7 +396,6 @@ def callback_query(call):
             bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
         if call.data == "remind":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="Добавить напоминание", callback_data=call.data + "_add")
             but_2 = types.InlineKeyboardButton(text="Удалить напоминание", callback_data=call.data + "_del")
@@ -384,7 +406,6 @@ def callback_query(call):
                                   reply_markup=key)
 
         if call.data == "remind_add":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="Каждый день", callback_data=call.data + "_0")
             but_2 = types.InlineKeyboardButton(text="Каждый месяц", callback_data=call.data + "_1")
@@ -395,7 +416,6 @@ def callback_query(call):
                                   reply_markup=key)
 
         if call.data == "remind_add_0" or call.data == "remind_add_1":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             but_1 = types.InlineKeyboardButton(text="Напоминание", callback_data=call.data + "_-1")
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="Выберите категорию трат или напоминание о заполнении:",
@@ -403,7 +423,6 @@ def callback_query(call):
                                                             callback=call.data + "_").add(but_1))
 
         if call.data[:len("remind_add_1_")] == "remind_add_1_" and call.data.count("_") == 3:
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             mesg = bot.send_message(call.message.chat.id, "🗓️ Введите день (число от 1 до 31)")
             bot.register_next_step_handler(mesg,
                                            lambda m: get_rem_data(message=m, user_id=call.from_user.id, type=1,
@@ -411,7 +430,6 @@ def callback_query(call):
                                                                       len("remind_add_1_"):]))
 
         if call.data[:len("remind_add_0_")] == "remind_add_0_" and call.data.count("_") == 3:
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
             btn1 = types.KeyboardButton("Текущее время")
             markup.add(btn1)
@@ -422,7 +440,6 @@ def callback_query(call):
                                                                       len("remind_add_0_"):]))
 
         if call.data == "remind_del":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             key = types.InlineKeyboardMarkup()
             list_rem = db.get_all_reminders(user_id=call.from_user.id)
             for l in list_rem:
@@ -435,9 +452,24 @@ def callback_query(call):
                                   reply_markup=key)
 
         if call.data[:len("remind_del_")] == "remind_del_":
-            bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
             db.erase_reminder(notification_id=int(call.data[len("remind_del_"):]))
             bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
+
+        if call.data == "predict":
+            key = types.InlineKeyboardMarkup()
+            but_1 = types.InlineKeyboardButton(text="catboost", callback_data="predict_catboost")
+            but_2 = types.InlineKeyboardButton(text="lama", callback_data="predict_lama")
+            but_3 = types.InlineKeyboardButton(text="ARIMA", callback_data="predict_ARIMA")
+            but_4 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
+            key.add(but_1, but_2, but_3, but_4)
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                  text="Выберите модель:",
+                                  reply_markup=key)
+
+        if call.data[:len("predict_")] == "predict_":
+            mesg = bot.send_message(call.message.chat.id, "Введите количество дней для предсказания")
+            bot.register_next_step_handler(mesg,
+                                           lambda m: get_pred_day(message=m, user_id=call.from_user.id, model=call.data[len("predict_"):]))
 
 
 @bot.message_handler(content_types=["text"])
@@ -574,5 +606,4 @@ def main():
 if __name__ == '__main__':
     # TODO: нужен ли тут flag_drop=True ?
     db.init_db(flag_drop=False)
-
     main()
