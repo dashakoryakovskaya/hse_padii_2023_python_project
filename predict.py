@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 
 import catboost as cb
-from lightautoml.automl.presets.tabular_presets import TabularUtilizedAutoML
-from lightautoml.tasks import Task
+# from lightautoml.automl.presets.tabular_presets import TabularUtilizedAutoML
+# from lightautoml.tasks import Task
 import torch
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -14,6 +14,18 @@ from sklearn.metrics import mean_squared_error
 import optuna
 import pickle
 import os
+
+import etna
+from etna.datasets import TSDataset
+from etna.models import AutoARIMAModel
+# from etna.models import ProphetModel
+# from etna.analysis import plot_forecast
+
+import statsmodels
+from statsmodels.graphics.tsaplots import plot_predict
+from statsmodels.tsa.arima_process import arma_generate_sample
+from statsmodels.tsa.arima.model import ARIMA
+
 
 
 def prepoc(df):
@@ -158,26 +170,61 @@ TIMEOUT = 10
 np.random.seed(RANDOM_STATE)
 torch.set_num_threads(N_THREADS)
 
-task = Task('reg')
+# task = Task('reg')
 
 
 def lama(df, new_df):
-    train = prepoc(df)
-    train = make_features(train)
+    pass
+#     train = prepoc(df)
+#     train = make_features(train)
+#
+#     TARGET_NAME = 'sum'
+#     roles = {
+#         'target': TARGET_NAME,
+#     }
+#     automl = TabularUtilizedAutoML(
+#         task=task,
+#         timeout=TIMEOUT,
+#         cpu_limit=N_THREADS,
+#         reader_params={'n_jobs': N_THREADS, 'cv': N_FOLDS, 'random_state': RANDOM_STATE})
+#     oof_pred = automl.fit_predict(train, roles=roles, verbose=False)
+#     new_df = make_features(prepoc_new(new_df))
+#     res = automl.predict(new_df)
+#     df = pd.DataFrame(res.data[:, 0], columns=['sum'])
+#     df['date'] = new_df['date']
+#     return df
 
-    TARGET_NAME = 'sum'
-    roles = {
-        'target': TARGET_NAME,
-    }
-    automl = TabularUtilizedAutoML(
-        task=task,
-        timeout=TIMEOUT,
-        cpu_limit=N_THREADS,
-        reader_params={'n_jobs': N_THREADS, 'cv': N_FOLDS, 'random_state': RANDOM_STATE})
-    oof_pred = automl.fit_predict(train, roles=roles, verbose=False)
-    new_df = make_features(prepoc_new(new_df))
-    res = automl.predict(new_df)
-    df = pd.DataFrame(res.data[:, 0], columns=['sum'])
-    df['date'] = new_df['date']
-    return df
 
+def arima_statsmodels(df, start_date, end_date, p, q, d):
+    series = df.set_index('sum')['date']
+    arima_mod = ARIMA(series, order=(p, q, d))
+    # print(type(arima_mod))
+    arima_res = arima_mod.fit()
+    res = arima_res.predict(start=start_date, end=end_date)
+    print(type(res))
+    return res
+
+
+def arima_etna(df, days, p, d, q):
+    df.columns = ['timestamp', 'target']
+    train_start = str(df['timestamp'][0])
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df["segment"] = "main"
+    df = TSDataset.to_dataset(df)
+    ts = TSDataset(df=df, freq='D')
+    # train_ts, test_ts = ts.train_test_split(
+    #     train_start=train_start,
+    #     train_end=start_date,
+    #     test_start=start_date,
+    #     test_end=end_date,
+    # )
+    model = AutoARIMAModel(order=(p, d, q))
+    model.fit(ts)
+    horison = days
+    future_ts = ts.make_future(horison)
+    forecast_ts = model.forecast(future_ts)
+    pd_forecast = forecast_ts.to_pandas()
+    forecast = pd_forecast.reset_index()
+    forecast.columns = ['timestamp', 'target']
+    print(forecast['timestamp'])
+    return forecast

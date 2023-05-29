@@ -1,5 +1,6 @@
 import sqlite3
 import bot
+import pandas as pd
 from prettytable import from_db_cursor
 
 __connection = None
@@ -387,9 +388,9 @@ def get_cards(conn, user_id: int):
 @ensure_connection
 def get_df(conn, user_id: int):
     c = conn.cursor()
-    c.execute(f'SELECT date, sum FROM expenses WHERE user_id={user_id};')
-    res = c.fetchall()
-    return res
+    query = f'SELECT date, sum FROM expenses WHERE user_id={user_id};'
+    df = pd.read_sql_query(query, conn)
+    return df
 
 @ensure_connection
 def sql_execute(conn, sql):

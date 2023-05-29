@@ -24,7 +24,9 @@ from fns import FnsAccess
 import fns
 
 import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
+matplotlib.use('agg')
 
 tconv = lambda x: time.strftime("%Y-%m-%d", time.localtime(x))
 tconv_time = lambda x: time.strftime("%H:%M", time.localtime(x))
@@ -256,7 +258,7 @@ def get_pred_day(message, user_id, model):
         bot.register_next_step_handler(mesg, lambda m: get_pred_day(message=m, user_id=user_id, model=model))
     else:
         if model == "catboost":
-            df = pd.DataFrame(db.get_df(user_id=user_id), columns=['date', 'sum'])
+            df = db.get_df(user_id=user_id)
 
             if 0.08 * df.shape[0] < 1:
                 bot.send_message(message.chat.id, "Слишком мало информации о расходах :(")
@@ -282,7 +284,7 @@ def get_pred_day(message, user_id, model):
             bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
             os.remove(f"files/{message.chat.id}/image.jpg")
         elif model == "lama":
-            df = pd.DataFrame(db.get_df(user_id=user_id), columns=['date', 'sum'])
+            df = db.get_df(user_id=user_id)
             str_start_date = pd.Timestamp(message.date, unit='s', tz='US/Pacific').strftime('%Y-%m-%d')
             pd_dates = pd.DataFrame(
                 pd.date_range(str_start_date, freq=datetime.timedelta(seconds=86400), periods=int(message.text)))
@@ -302,7 +304,42 @@ def get_pred_day(message, user_id, model):
             bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
             os.remove(f"files/{message.chat.id}/image.jpg")
 
+        elif model == "ARIMA":
+            df = db.get_df(user_id=user_id)
+            df.columns = ['date', 'sum']
+            df['date'] = pd.to_datetime(df['date'])
+            grouped_df = df.groupby('date')['sum'].sum().reset_index()
+            grouped_df = grouped_df.set_index('date')
+            df = grouped_df.resample('D').fillna(method='ffill')
+            df = df.reset_index()
+            print(str(message.date))
+            start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').strftime('%Y-%m-%d')).date()
+            print(start_date, type(start_date))
+            days = int(message.text)
+
+            # если использовать statsmodels
+            # print(start_date, end_date)
+            # df_train = df[df['date'] < start_date]
+            # df_test = df[df['date'] >= start_date]
+            # res = predict.arima(df=df, start_date=start_date, end_date=end_date, p=2, q=2, d=0)
+            # print(res)
+            # plt.figure(res)
+            # plt.savefig(f"files/{message.chat.id}/image.jpg")
+            # plt.clf()
+            # bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            # os.remove(f"files/{message.chat.id}/image.jpg")
+
+            # если использовать etna
+            res = predict.arima_etna(df=df, days=days, p=2, q=2, d=0)
+            plt.scatter(res['timestamp'], res['target'], c="red", linestyle="dotted")
+            plt.savefig(f"files/{message.chat.id}/image.jpg")
+            plt.clf()
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            os.remove(f"files/{message.chat.id}/image.jpg")
+
+
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
+
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
