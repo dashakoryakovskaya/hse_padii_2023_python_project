@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 
 import catboost as cb
-# from lightautoml.automl.presets.tabular_presets import TabularUtilizedAutoML
-# from lightautoml.tasks import Task
+from lightautoml.automl.presets.tabular_presets import TabularUtilizedAutoML
+from lightautoml.tasks import Task
 import torch
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -26,6 +26,8 @@ from statsmodels.graphics.tsaplots import plot_predict
 from statsmodels.tsa.arima_process import arma_generate_sample
 from statsmodels.tsa.arima.model import ARIMA
 
+import warnings
+warnings.filterwarnings("ignore")
 
 
 def prepoc(df):
@@ -111,7 +113,7 @@ def catboost(df, new_df):
         loss = mean_squared_error(y_valid, regressor.predict(X_valid.copy()))
         return loss
     study = optuna.create_study(study_name=f'catboost-seed{RANDOM_SEED}')
-    study.optimize(objective, n_trials=100, n_jobs=-1, timeout=24000, show_progress_bar=True)
+    study.optimize(objective, n_trials=100, n_jobs=-1, timeout=24000, show_progress_bar=False)
 
     optimized_regressor = cb.CatBoostRegressor(learning_rate=study.best_params['learning_rate'],
                                             depth=study.best_params['depth'],
@@ -170,29 +172,29 @@ TIMEOUT = 10
 np.random.seed(RANDOM_STATE)
 torch.set_num_threads(N_THREADS)
 
-# task = Task('reg')
+task = Task('reg')
 
 
 def lama(df, new_df):
-    pass
-#     train = prepoc(df)
-#     train = make_features(train)
-#
-#     TARGET_NAME = 'sum'
-#     roles = {
-#         'target': TARGET_NAME,
-#     }
-#     automl = TabularUtilizedAutoML(
-#         task=task,
-#         timeout=TIMEOUT,
-#         cpu_limit=N_THREADS,
-#         reader_params={'n_jobs': N_THREADS, 'cv': N_FOLDS, 'random_state': RANDOM_STATE})
-#     oof_pred = automl.fit_predict(train, roles=roles, verbose=False)
-#     new_df = make_features(prepoc_new(new_df))
-#     res = automl.predict(new_df)
-#     df = pd.DataFrame(res.data[:, 0], columns=['sum'])
-#     df['date'] = new_df['date']
-#     return df
+    # pass
+    train = prepoc(df)
+    train = make_features(train)
+
+    TARGET_NAME = 'sum'
+    roles = {
+        'target': TARGET_NAME,
+    }
+    automl = TabularUtilizedAutoML(
+        task=task,
+        timeout=TIMEOUT,
+        cpu_limit=N_THREADS,
+        reader_params={'n_jobs': N_THREADS, 'cv': N_FOLDS, 'random_state': RANDOM_STATE})
+    oof_pred = automl.fit_predict(train, roles=roles, verbose=False)
+    new_df = make_features(prepoc_new(new_df))
+    res = automl.predict(new_df)
+    df = pd.DataFrame(res.data[:, 0], columns=['sum'])
+    df['date'] = new_df['date']
+    return df
 
 
 def arima_statsmodels(df, start_date, end_date, p, q, d):
