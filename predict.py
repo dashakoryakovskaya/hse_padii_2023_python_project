@@ -210,6 +210,7 @@ def arima_etna(df, days, p, d, q):
     train_start = str(df['timestamp'][0])
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df["segment"] = "main"
+    print(df)
     df = TSDataset.to_dataset(df)
     ts = TSDataset(df=df, freq='D')
     # train_ts, test_ts = ts.train_test_split(
@@ -226,5 +227,5 @@ def arima_etna(df, days, p, d, q):
     pd_forecast = forecast_ts.to_pandas()
     forecast = pd_forecast.reset_index()
     forecast.columns = ['timestamp', 'target']
-    print(forecast['timestamp'])
+    print(forecast)
     return forecast

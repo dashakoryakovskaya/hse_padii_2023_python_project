@@ -32,6 +32,29 @@ def ensure_connection(func):
 
 
 @ensure_connection
+def add_real_data(conn, user_id):
+    # c = conn.cursor()
+    df_flat = pd.read_csv("personal_transactions_data.csv")
+    filtered_data = df_flat[df_flat.iloc[:, 3] == "debit"]
+    columns_to_drop = [1, 3, 4, 5]
+    filtered_data = filtered_data.drop(filtered_data.columns[columns_to_drop], axis=1)
+    filtered_data.columns = ['date', 'sum']
+    filtered_data['date'] = pd.to_datetime(filtered_data['date'])
+    grouped_data = filtered_data.groupby('date')['sum'].sum().reset_index()
+    grouped_data = grouped_data.set_index('date')
+    df_resampled = grouped_data.resample('D').fillna(method='ffill')
+    df_resampled = df_resampled.reset_index()
+    df_resampled["type"] = 1
+    df_resampled.insert(loc=0, column='user_id', value=user_id)
+    df = df_resampled
+    df.index.rename('id', inplace=True)
+    # df_resampled["user_id"] = user_id
+    print(df)
+    df.to_sql('expenses', con=conn, schema='dbo', if_exists='replace')
+    # c.execute(f'INSERT INTO expenses (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
+
+
+@ensure_connection
 def init_db(conn, flag_drop: bool = False):
     # conn = get_connection()
     c = conn.cursor()
@@ -121,6 +144,7 @@ def init_db(conn, flag_drop: bool = False):
     );''')
 
     conn.commit()
+    add_real_data(user_id=219102395)
 
 
 def add_default_categories(conn, user_id: int):
