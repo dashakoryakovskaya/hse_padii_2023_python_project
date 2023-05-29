@@ -23,6 +23,9 @@ import os
 from fns import FnsAccess
 import fns
 
+import requests
+import json
+
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
@@ -34,6 +37,51 @@ tconv_time = lambda x: time.strftime("%H:%M", time.localtime(x))
 STOP_BOT_FLAG = False
 
 bot = telebot.TeleBot(config.token)
+
+# api get image from html
+instructions = {
+    'parts': [
+        {
+            'html': 'document'
+        }
+    ],
+    'output': {
+        'type': 'image',
+        'format': 'jpg',
+        #'width': 200
+        'dpi': 300
+    }
+}
+
+
+def html_to_jpg(chat_id, user_id, type, ex_in, all_period=False, data_start='', data_end=''):
+    with open(f'files/{chat_id}/index.html', 'w') as ind:
+        ind.write(
+            f'<pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string()}</pre>')
+    response = requests.request(
+        'POST',
+        'https://api.pspdfkit.com/build',
+        headers={
+            'Authorization': 'Bearer pdf_live_x1L2pZwnNLoGTXSfb7gQUs4VRihmjErNYVundnIdomy'
+        },
+        files={
+            'document': open(f'files/{chat_id}/index.html', 'rb')
+        },
+        data={
+            'instructions': json.dumps(instructions)
+        },
+        stream=True
+    )
+    if response.ok:
+        with open(f'files/{chat_id}/image.jpg', 'wb') as fd:
+            for chunk in response.iter_content(chunk_size=8096):
+                fd.write(chunk)
+    else:
+        print(response.text)
+        exit()
+    bot.send_photo(chat_id, photo=open(f'files/{chat_id}/image.jpg', 'rb'))
+    os.remove(f'files/{chat_id}/index.html')
+    os.remove(f'files/{chat_id}/image.jpg')
 
 
 def list_of_tuples_to_str(list_tup: list):
@@ -171,9 +219,10 @@ def get_data_period(message, user_id, type, ex_in, sum_all):
         sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=True)
         bot.send_message(message.chat.id, text="Сумма:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
         if sum_all == "all":
-            bot.send_message(message.chat.id,
+            '''bot.send_message(message.chat.id,
                              text=f'<pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=True).get_string()}</pre>',
-                             parse_mode="HTML")
+                             parse_mode="HTML") '''
+            html_to_jpg(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, all_period=True)
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
         return
     if len(message.text) != 21 or is_incorrect_date_format(message.text[:10]) or is_incorrect_date_format(
@@ -188,9 +237,11 @@ def get_data_period(message, user_id, type, ex_in, sum_all):
                          data_end=data_end)
         bot.send_message(message.chat.id, text="Сумма:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
         if sum_all == "all":
-            bot.send_message(message.chat.id,
+            '''bot.send_message(message.chat.id,
                              text=f'<pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, data_start=data_start, data_end=data_end).get_string()}</pre>',
-                             parse_mode="HTML")
+                             parse_mode="HTML") '''
+            html_to_jpg(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, data_start=data_start,
+                        data_end=data_end)
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
@@ -212,6 +263,7 @@ def get_card_name(message, user_id, name):
             binary = sqlite3.Binary(f.read())
 
         db.add_card(user_id=user_id, name=name, card=binary)
+        os.remove(src)
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
@@ -427,8 +479,9 @@ def callback_query(call):
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="📃 Получить карту", callback_data="cards_get")
             but_2 = types.InlineKeyboardButton(text="✅ Добавить карту", callback_data="cards_add")
-            but_3 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
-            key.add(but_1, but_2, but_3)
+            but_3 = types.InlineKeyboardButton(text="❌ Удалить карту", callback_data="cards_del")
+            but_4 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
+            key.add(but_1, but_2, but_3, but_4)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="📎 Выберите действие:",
                                   reply_markup=key)
@@ -456,10 +509,24 @@ def callback_query(call):
                     break
             bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
+        if call.data == "cards_del":
+            key = types.InlineKeyboardMarkup()
+            list_rem = db.get_all_cards_name(user_id=call.from_user.id)
+            for l in list_rem:
+                key.add(types.InlineKeyboardButton(text=l[0], callback_data="cards_del_" + str(l[0])))
+            key.add(types.InlineKeyboardButton(text="📌 Меню", callback_data="menu"))
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                  text="Выберите карту:",
+                                  reply_markup=key)
+
+        if call.data[:len("cards_del_")] == "cards_del_":
+            db.erase_card(user_id=call.from_user.id, name=call.data[len("cards_del_"):])
+            bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
+
         if call.data == "remind":
             key = types.InlineKeyboardMarkup()
-            but_1 = types.InlineKeyboardButton(text="Добавить напоминание", callback_data=call.data + "_add")
-            but_2 = types.InlineKeyboardButton(text="Удалить напоминание", callback_data=call.data + "_del")
+            but_1 = types.InlineKeyboardButton(text="✅ Добавить напоминание", callback_data=call.data + "_add")
+            but_2 = types.InlineKeyboardButton(text="❌ Удалить напоминание", callback_data=call.data + "_del")
             but_3 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
             key.add(but_1, but_2, but_3)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,

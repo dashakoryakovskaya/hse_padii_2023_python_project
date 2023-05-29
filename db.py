@@ -428,6 +428,21 @@ def add_card(conn, user_id: int, name: str, card):
 
 
 @ensure_connection
+def erase_card(conn, user_id: int, name: str):
+    c = conn.cursor()
+    c.execute(f'DELETE FROM cards WHERE user_id={user_id} AND name="{name}";')
+    conn.commit()
+
+
+@ensure_connection
+def get_all_cards_name(conn, user_id: int):
+    c = conn.cursor()
+    c.execute(f'SELECT name FROM cards WHERE user_id={user_id};')
+    res = c.fetchall()
+    return res
+
+
+@ensure_connection
 def get_cards(conn, user_id: int):
     # conn = get_connection()
     c = conn.cursor()
