@@ -93,7 +93,7 @@ def catboost(df, new_df):
     def objective(trial):
         param = {}
         param['learning_rate'] = trial.suggest_discrete_uniform("learning_rate", 0.001, 0.02, 0.001)
-        param['depth'] = trial.suggest_int('depth', 9, 15)
+        param['depth'] = trial.suggest_int('depth', 4, 15)
         param['l2_leaf_reg'] = trial.suggest_discrete_uniform('l2_leaf_reg', 1.0, 5.5, 0.5)
         param['min_child_samples'] = trial.suggest_categorical('min_child_samples', [1, 4, 8, 16, 32])
         param['grow_policy'] = 'Depthwise'
@@ -166,7 +166,7 @@ N_THREADS = 40
 N_FOLDS = 3
 RANDOM_STATE = 56
 TEST_SIZE = 0.2
-TIMEOUT = 10
+TIMEOUT = 60
 
 
 np.random.seed(RANDOM_STATE)

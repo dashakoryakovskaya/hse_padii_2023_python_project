@@ -23,9 +23,6 @@ import os
 from fns import FnsAccess
 import fns
 
-import requests
-import json
-
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
@@ -38,50 +35,14 @@ STOP_BOT_FLAG = False
 
 bot = telebot.TeleBot(config.token)
 
-# api get image from html
-instructions = {
-    'parts': [
-        {
-            'html': 'document'
-        }
-    ],
-    'output': {
-        'type': 'image',
-        'format': 'jpg',
-        #'width': 200
-        'dpi': 300
-    }
-}
-
 
 def html_to_jpg(chat_id, user_id, type, ex_in, all_period=False, data_start='', data_end=''):
-    with open(f'files/{chat_id}/index.html', 'w') as ind:
+    with open(f'files/{chat_id}/statistic.html', 'w') as ind:
+        print(db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string())
         ind.write(
-            f'<pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string()}</pre>')
-    response = requests.request(
-        'POST',
-        'https://api.pspdfkit.com/build',
-        headers={
-            'Authorization': 'Bearer pdf_live_x1L2pZwnNLoGTXSfb7gQUs4VRihmjErNYVundnIdomy'
-        },
-        files={
-            'document': open(f'files/{chat_id}/index.html', 'rb')
-        },
-        data={
-            'instructions': json.dumps(instructions)
-        },
-        stream=True
-    )
-    if response.ok:
-        with open(f'files/{chat_id}/image.jpg', 'wb') as fd:
-            for chunk in response.iter_content(chunk_size=8096):
-                fd.write(chunk)
-    else:
-        print(response.text)
-        exit()
-    bot.send_photo(chat_id, photo=open(f'files/{chat_id}/image.jpg', 'rb'))
-    os.remove(f'files/{chat_id}/index.html')
-    os.remove(f'files/{chat_id}/image.jpg')
+            f'<meta charset="Windows-1251" /><pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string()}</pre>')
+    bot.send_document(chat_id, open(f'files/{chat_id}/statistic.html', 'rb'))
+    os.remove(f'files/{chat_id}/statistic.html')
 
 
 def list_of_tuples_to_str(list_tup: list):
@@ -323,12 +284,12 @@ def get_pred_day(message, user_id, model):
 
             res = predict.catboost(df=df, new_df=pd_dates)
 
-            file = open(f"files/{message.chat.id}/pred.txt", "w")
+            file = open(f"files/{message.chat.id}/predict.txt", "w")
             for i, row in res.iterrows():
                 file.write(f'{row["date"].date().strftime("%d-%m-%Y")} | {round(row["sum"], 3)}\n')
             file.close()
-            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/pred.txt", "r"))
-            os.remove(f"files/{message.chat.id}/pred.txt")
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict.txt")
 
             plt.scatter(res['date'], res['sum'], c="red", linestyle="dotted")
             plt.savefig(f"files/{message.chat.id}/image.jpg")
@@ -343,12 +304,12 @@ def get_pred_day(message, user_id, model):
             pd_dates.columns = ['date']
             res = predict.lama(df=df, new_df=pd_dates)
 
-            file = open(f"files/{message.chat.id}/pred.txt", "w")
+            file = open(f"files/{message.chat.id}/predict.txt", "w")
             for i, row in res.iterrows():
                 file.write(f'{row["date"].date().strftime("%d-%m-%Y")} | {round(row["sum"], 3)}\n')
             file.close()
-            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/pred.txt", "r"))
-            os.remove(f"files/{message.chat.id}/pred.txt")
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict.txt")
 
             plt.scatter(res['date'], res['sum'], c="red", linestyle="dotted")
             plt.savefig(f"files/{message.chat.id}/image.jpg")
