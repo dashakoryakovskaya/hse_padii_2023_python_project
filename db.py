@@ -231,6 +231,42 @@ def get_sum(conn, user_id: int, type: int, ex_in: str, all_period=False, data_st
             return res '''
 
 
+def get_categories(ex_in: str):
+    if ex_in == 'ex':
+        return ex_default_categories
+    else:
+        return in_default_categories
+
+
+def get_categories_rev(ex_in: str):
+    if ex_in == 'ex':
+        return ex_default_categories_rev
+    else:
+        return in_default_categories_rev
+
+
+@ensure_connection
+def get_sum_group(conn, user_id: int, ex_in: str, all_period=True, data_start='', data_end=''):
+    c = conn.cursor()
+    if ex_in == 'ex':
+        ex_in = "expenses"
+    else:
+        ex_in = "incomes"
+    sql = f'SELECT type, SUM(sum) FROM {ex_in} WHERE user_id={user_id} GROUP BY type' if all_period else \
+            f'SELECT type, SUM(sum) FROM {ex_in} WHERE user_id={user_id} AND date BETWEEN \'{data_start}\' AND \'{data_end}\' GROUP BY type'
+
+    c.execute(sql)
+    res = c.fetchall()
+    y = []
+    lables = []
+    categories = get_categories_rev(ex_in=ex_in[:2])
+    for i in range(len(res)):
+        lables.append(categories[res[i][0]])
+        y.append(res[i][1])
+
+    return [y, lables]
+
+
 @ensure_connection
 def get_all_statistic(conn, user_id: int, type: int, ex_in: str, all_period=False, data_start='', data_end=''):
     # conn = get_connection()
@@ -312,13 +348,6 @@ def get_categories(conn, user_id: int, ex_in: str):
         c.execute(f'SELECT name, num FROM incomes_categories WHERE user_id={user_id};')
         res2 = c.fetchall()
         return (len(res1), dict(res1), dict(res2))'''
-
-
-def get_categories(ex_in: str):
-    if ex_in == 'ex':
-        return ex_default_categories
-    else:
-        return in_default_categories
 
 
 @ensure_connection
