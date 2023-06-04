@@ -51,6 +51,11 @@ def add_real_data(conn, user_id, name_of_file):
     grouped_data = grouped_data.set_index('date')
     df_resampled = grouped_data.resample('D').fillna(method='ffill')
     df_resampled = df_resampled.reset_index()
+
+    c = conn.cursor()
+    total_sum = df_resampled['sum'].sum()
+    c.execute(f'UPDATE balance SET total = (SELECT total FROM balance WHERE user_id={user_id}) - {total_sum} WHERE user_id={user_id};')
+
     df_resampled["type"] = 1
     df_resampled.insert(loc=0, column='user_id', value=user_id)
     df = df_resampled
@@ -58,6 +63,7 @@ def add_real_data(conn, user_id, name_of_file):
     # df_resampled["user_id"] = user_id
     # print(df)
     df.to_sql('expenses', con=conn, schema='dbo', if_exists='replace')
+    conn.commit()
     # c.execute(f'INSERT INTO expenses (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
 
 
