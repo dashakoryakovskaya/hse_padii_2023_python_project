@@ -284,12 +284,12 @@ def get_pred_day(message, user_id, model):
 
             res = predict.catboost(df=df, new_df=pd_dates)
 
-            file = open(f"files/{message.chat.id}/predict.txt", "w")
+            file = open(f"files/{message.chat.id}/predict{str_start_date}.txt", "w")
             for i, row in res.iterrows():
                 file.write(f'{row["date"].date().strftime("%d-%m-%Y")} | {round(row["sum"], 3)}\n')
             file.close()
-            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict.txt", "r"))
-            os.remove(f"files/{message.chat.id}/predict.txt")
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict{str_start_date}.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict{str_start_date}.txt")
 
             plt.scatter(res['date'], res['sum'], c="red", linestyle="dotted")
             plt.savefig(f"files/{message.chat.id}/image.jpg")
@@ -304,12 +304,12 @@ def get_pred_day(message, user_id, model):
             pd_dates.columns = ['date']
             res = predict.lama(df=df, new_df=pd_dates)
 
-            file = open(f"files/{message.chat.id}/predict.txt", "w")
+            file = open(f"files/{message.chat.id}/predict{str_start_date}.txt", "w")
             for i, row in res.iterrows():
                 file.write(f'{row["date"].date().strftime("%d-%m-%Y")} | {round(row["sum"], 3)}\n')
             file.close()
-            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict.txt", "r"))
-            os.remove(f"files/{message.chat.id}/predict.txt")
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict{str_start_date}.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict{str_start_date}.txt")
 
             plt.scatter(res['date'], res['sum'], c="red", linestyle="dotted")
             plt.savefig(f"files/{message.chat.id}/image.jpg")
@@ -350,12 +350,12 @@ def get_pred_day(message, user_id, model):
             print(train_df)
             print(res)
             dates = pd.date_range(start_date, freq=datetime.timedelta(days=1), periods=len(res['target']))
-            file = open(f"files/{message.chat.id}/predict.txt", "w")
+            file = open(f"files/{message.chat.id}/predict{start_date}.txt", "w")
             for i, row in res.iterrows():
                 file.write(f'{dates[i].date().strftime("%d-%m-%Y")} | {round(row["target"], 3)}\n')
             file.close()
-            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict.txt", "r"))
-            os.remove(f"files/{message.chat.id}/predict.txt")
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict{start_date}.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict{start_date}.txt")
 
             plt.plot(train_df['timestamp'], train_df['target'], c="rosybrown", linestyle=":")
             plt.plot(res['timestamp'], res['target'], c="cornflowerblue", linestyle="-")
@@ -380,12 +380,12 @@ def get_pred_day(message, user_id, model):
             # если использовать etna
             res, train_df = predict.prophet_etna(df=df, days=days)
             dates = pd.date_range(start_date, freq=datetime.timedelta(days=1), periods=len(res['target']))
-            file = open(f"files/{message.chat.id}/predict.txt", "w")
+            file = open(f"files/{message.chat.id}/predict{start_date}.txt", "w")
             for i, row in res.iterrows():
                 file.write(f'{dates[i].date().strftime("%d-%m-%Y")} | {round(row["target"], 3)}\n')
             file.close()
-            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict.txt", "r"))
-            os.remove(f"files/{message.chat.id}/predict.txt")
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict{start_date}.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict{start_date}.txt")
 
             plt.plot(train_df['timestamp'], train_df['target'], c="rosybrown", linestyle=":")
             plt.plot(res['timestamp'], res['target'], c="cornflowerblue", linestyle="-")
