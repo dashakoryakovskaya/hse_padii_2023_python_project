@@ -34,14 +34,19 @@ def ensure_connection(func):
 
 
 @ensure_connection
-def add_real_data(conn, user_id):
+def add_real_data(conn, user_id, name_of_file):
     # c = conn.cursor()
-    df_flat = pd.read_csv("personal_transactions_data.csv")
+    df_flat = pd.read_csv(f"{name_of_file}.csv")
     filtered_data = df_flat[df_flat.iloc[:, 3] == "debit"]
     columns_to_drop = [1, 3, 4, 5]
     filtered_data = filtered_data.drop(filtered_data.columns[columns_to_drop], axis=1)
     filtered_data.columns = ['date', 'sum']
     filtered_data['date'] = pd.to_datetime(filtered_data['date'])
+
+    for i, row in filtered_data.iterrows():
+        filtered_data.loc[(filtered_data['date'] == row['date']), 'date'] = row['date'].replace(
+            year=row['date'].year + 4)
+
     grouped_data = filtered_data.groupby('date')['sum'].sum().reset_index()
     grouped_data = grouped_data.set_index('date')
     df_resampled = grouped_data.resample('D').fillna(method='ffill')
@@ -51,33 +56,34 @@ def add_real_data(conn, user_id):
     df = df_resampled
     df.index.rename('id', inplace=True)
     # df_resampled["user_id"] = user_id
-    print(df)
+    # print(df)
     df.to_sql('expenses', con=conn, schema='dbo', if_exists='replace')
     # c.execute(f'INSERT INTO expenses (user_id, date, sum, type) VALUES (?, ?, ?, ?);', (user_id, date, sum, type))
 
 
-@ensure_connection
-def add_real_data_2(conn, user_id):
-    # c = conn.cursor()
-    df_flat = pd.read_csv("personal_transactions_bot.csv")
-    filtered_data = df_flat[df_flat.iloc[:, 3] == "debit"]
-    columns_to_drop = [1, 3, 4, 5]
-    filtered_data = filtered_data.drop(filtered_data.columns[columns_to_drop], axis=1)
-    filtered_data.columns = ['date', 'sum']
-    filtered_data['date'] = pd.to_datetime(filtered_data['date'])
-    for i, row in filtered_data.iterrows():
-        filtered_data.loc[(filtered_data['date'] ==  row['date']), 'date'] = row['date'].replace(year=row['date'].year + 4)
-    grouped_data = filtered_data.groupby('date')['sum'].sum().reset_index()
-    grouped_data = grouped_data.set_index('date')
-    df_resampled = grouped_data.resample('D').fillna(method='ffill')
-    df_resampled = df_resampled.reset_index()
-    df_resampled["type"] = 1
-    df_resampled.insert(loc=0, column='user_id', value=user_id)
-    df = df_resampled
-    df.index.rename('id', inplace=True)
-    # df_resampled["user_id"] = user_id
-    print(df)
-    df.to_sql('expenses', con=conn, schema='dbo', if_exists='replace')
+# @ensure_connection
+# def add_real_data_2(conn, user_id):
+#     # c = conn.cursor()
+#     df_flat = pd.read_csv("personal_transactions_bot.csv")
+#     filtered_data = df_flat[df_flat.iloc[:, 3] == "debit"]
+#     columns_to_drop = [1, 3, 4, 5]
+#     filtered_data = filtered_data.drop(filtered_data.columns[columns_to_drop], axis=1)
+#     filtered_data.columns = ['date', 'sum']
+#     filtered_data['date'] = pd.to_datetime(filtered_data['date'])
+#     for i, row in filtered_data.iterrows():
+#         filtered_data.loc[(filtered_data['date'] ==  row['date']), 'date'] = row['date'].
+#         replace(year=row['date'].year + 4)
+#     grouped_data = filtered_data.groupby('date')['sum'].sum().reset_index()
+#     grouped_data = grouped_data.set_index('date')
+#     df_resampled = grouped_data.resample('D').fillna(method='ffill')
+#     df_resampled = df_resampled.reset_index()
+#     df_resampled["type"] = 1
+#     df_resampled.insert(loc=0, column='user_id', value=user_id)
+#     df = df_resampled
+#     df.index.rename('id', inplace=True)
+#     # df_resampled["user_id"] = user_id
+#     print(df)
+#     df.to_sql('expenses', con=conn, schema='dbo', if_exists='replace')
 
 
 @ensure_connection
@@ -170,8 +176,8 @@ def init_db(conn, flag_drop: bool = False):
     );''')
 
     conn.commit()
-    add_real_data(user_id=219102395)
-    add_real_data_2(user_id=1067952257)
+    add_real_data(user_id=219102395, name_of_file='personal_transactions_bot')
+    # add_real_data(user_id=1067952257, name_of_file='personal_transactions_bot')
 
 
 def add_default_categories(conn, user_id: int):
@@ -391,7 +397,8 @@ def get_all_reminders(conn, user_id: int):
 
 
 @ensure_connection
-def add_reminder(conn, user_id: int, time = '', category=-1, date=-1, text="Мечтаю узнать о том, сколько ты сегодня потратил! Ну и получил🤑", type=0):
+def add_reminder(conn, user_id: int, time='', category=-1, date=-1, text="Мечтаю узнать о том, сколько ты сегодня"
+                                                                         " потратил! Ну и получил🤑", type=0):
     # conn = get_connection()
     c = conn.cursor()
     c.execute('INSERT INTO reminders (user_id, type, date, time, category) VALUES (?, ?, ?, ?, ?);',

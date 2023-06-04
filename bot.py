@@ -317,17 +317,20 @@ def get_pred_day(message, user_id, model):
             bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
             os.remove(f"files/{message.chat.id}/image.jpg")
 
-        elif model == "ARIMA":
+        elif model == "arima":
             df = db.get_df(user_id=user_id)
-            df.columns = ['date', 'sum']
+            df = df[['date', 'sum']]
+            print(df)
+            # df.columns = ['date', 'sum']
             df['date'] = pd.to_datetime(df['date'])
             grouped_df = df.groupby('date')['sum'].sum().reset_index()
             grouped_df = grouped_df.set_index('date')
             df = grouped_df.resample('D').fillna(method='ffill')
             df = df.reset_index()
             print(str(message.date))
-            start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').strftime('%Y-%m-%d')).date()
-            print(start_date, type(start_date))
+            start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').
+                                        strftime('%Y-%m-%d')).date()
+            # print(start_date, type(start_date))
             days = int(message.text)
 
             # если использовать statsmodels
@@ -343,14 +346,53 @@ def get_pred_day(message, user_id, model):
             # os.remove(f"files/{message.chat.id}/image.jpg")
 
             # если использовать etna
-            res = predict.arima_etna(df=df, days=days, p=2, q=2, d=0)
-            plt.scatter(res['timestamp'], res['target'], c="red", linestyle="dotted")
+            res, train_df = predict.arima_etna(df=df, days=days, p=10, q=0, d=0)
+            print(train_df)
+            print(res)
+            dates = pd.date_range(start_date, freq=datetime.timedelta(days=1), periods=len(res['target']))
+            file = open(f"files/{message.chat.id}/predict.txt", "w")
+            for i, row in res.iterrows():
+                file.write(f'{dates[i].date().strftime("%d-%m-%Y")} | {round(row["target"], 3)}\n')
+            file.close()
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict.txt")
+
+            plt.plot(train_df['timestamp'], train_df['target'], c="rosybrown", linestyle=":")
+            plt.plot(res['timestamp'], res['target'], c="cornflowerblue", linestyle="-")
             plt.savefig(f"files/{message.chat.id}/image.jpg")
             plt.clf()
             bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
             os.remove(f"files/{message.chat.id}/image.jpg")
 
+        elif model == "prophet":
+            df = db.get_df(user_id=user_id)
+            df = df[['date', 'sum']]
+            # df.columns = ['date', 'sum']
+            df['date'] = pd.to_datetime(df['date'])
+            grouped_df = df.groupby('date')['sum'].sum().reset_index()
+            grouped_df = grouped_df.set_index('date')
+            df = grouped_df.resample('D').fillna(method='ffill')
+            df = df.reset_index()
+            start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').
+                                        strftime('%Y-%m-%d')).date()
+            days = int(message.text)
 
+            # если использовать etna
+            res, train_df = predict.prophet_etna(df=df, days=days)
+            dates = pd.date_range(start_date, freq=datetime.timedelta(days=1), periods=len(res['target']))
+            file = open(f"files/{message.chat.id}/predict.txt", "w")
+            for i, row in res.iterrows():
+                file.write(f'{dates[i].date().strftime("%d-%m-%Y")} | {round(row["target"], 3)}\n')
+            file.close()
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict.txt")
+
+            plt.plot(train_df['timestamp'], train_df['target'], c="rosybrown", linestyle=":")
+            plt.plot(res['timestamp'], res['target'], c="cornflowerblue", linestyle="-")
+            plt.savefig(f"files/{message.chat.id}/image.jpg")
+            plt.clf()
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            os.remove(f"files/{message.chat.id}/image.jpg")
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
@@ -548,9 +590,10 @@ def callback_query(call):
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="catboost", callback_data="predict_catboost")
             but_2 = types.InlineKeyboardButton(text="lama", callback_data="predict_lama")
-            but_3 = types.InlineKeyboardButton(text="ARIMA", callback_data="predict_ARIMA")
-            but_4 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
-            key.add(but_1, but_2, but_3, but_4)
+            but_3 = types.InlineKeyboardButton(text="arima", callback_data="predict_arima")
+            but_4 = types.InlineKeyboardButton(text="prophet", callback_data="predict_prophet")
+            but_5 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
+            key.add(but_1, but_2, but_3, but_4, but_5)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="Выберите модель:",
                                   reply_markup=key)
