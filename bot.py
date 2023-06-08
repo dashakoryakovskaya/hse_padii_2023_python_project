@@ -1,6 +1,7 @@
 import sqlite3
 import db
 import config
+import predict
 
 import telebot
 from telebot import types
@@ -13,7 +14,7 @@ from threading import Thread
 import requests
 import json
 
-from datetime import datetime
+import datetime
 import time
 # from notifiers import get_notifier
 import schedule
@@ -26,12 +27,26 @@ import fns
 import requests
 import json
 
+import pandas as pd
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use('agg')
+
 tconv = lambda x: time.strftime("%Y-%m-%d", time.localtime(x))
 tconv_time = lambda x: time.strftime("%H:%M", time.localtime(x))
 
 STOP_BOT_FLAG = False
 
 bot = telebot.TeleBot(config.token)
+
+
+def html_to_jpg(chat_id, user_id, type, ex_in, all_period=False, data_start='', data_end=''):
+    with open(f'files/{chat_id}/statistic.html', 'w') as ind:
+        print(db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string())
+        ind.write(
+            f'<meta charset="Windows-1251" /><pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string()}</pre>')
+    bot.send_document(chat_id, open(f'files/{chat_id}/statistic.html', 'rb'))
+    os.remove(f'files/{chat_id}/statistic.html')
 
 
 def list_of_tuples_to_str(list_tup: list):
@@ -91,7 +106,8 @@ def menu_key():
     but_3 = types.InlineKeyboardButton(text="📃 Статистика", callback_data="data")
     but_4 = types.InlineKeyboardButton(text="✔️ Дисконтные карты", callback_data="cards")
     but_5 = types.InlineKeyboardButton(text="🔔 Напоминания", callback_data="remind")
-    key.add(but_1, but_2, but_3, but_4, but_5)
+    but_6 = types.InlineKeyboardButton(text="Предсказания расходов", callback_data="predict")
+    key.add(but_1, but_2, but_3, but_4, but_5, but_6)
     return key
 
 
@@ -108,6 +124,7 @@ def category_key(user_id, ex_in, callback):
 def start_message(message):
     bot.clear_step_handler_by_chat_id(chat_id=message.chat.id)
     bot.send_message(message.chat.id, "Привет ✌️ Я - бот для отслеживания твоих финансов!", reply_markup=menu_key())
+    db.add_user(user_id=message.from_user.id, name=message.from_user.username)
 
 
 # TODO: нужна /stop команда?
@@ -264,8 +281,7 @@ def get_rem_data(message, user_id, type, cat):
                                                               cat=cat, day=int(message.text)))
     else:
         mesg = bot.send_message(message.chat.id, "😥 Неправильный формат день от 1 до 31\nВведите еще раз:")
-        bot.register_next_step_handler(mesg,
-                                       lambda m: get_rem_data(message=m, user_id=user_id, type=type, cat=cat))
+        bot.register_next_step_handler(mesg, lambda m: get_rem_data(message=m, user_id=user_id, type=type, cat=cat))
 
 
 def is_incorrect_time_format(string):
@@ -277,8 +293,7 @@ def is_incorrect_time_format(string):
 def get_rem_time(message, user_id, type, cat, day=-1):
     if message.text != "Текущее время" and is_incorrect_time_format(message.text):
         mesg = bot.send_message(message.chat.id, "😥 Неправильный формат HH:MM\nВведите еще раз:")
-        bot.register_next_step_handler(mesg,
-                                       lambda m: get_rem_time(message=m, user_id=user_id, type=type, cat=cat, day=day))
+        bot.register_next_step_handler(mesg, lambda m: get_rem_time(message=m, user_id=user_id, type=type, cat=cat, day=day))
     else:
         mesg = bot.send_message(message.chat.id, "Введите текст:", reply_markup=types.ReplyKeyboardRemove())
         time = message.text if message.text != "Текущее время" else tconv_time(message.date)
@@ -292,10 +307,142 @@ def get_rem_text(message, user_id, type, cat, day, time):
     bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
+def get_pred_day(message, user_id, model):
+    if not(message.text.isdigit()) or int(message.text) < 0:
+        mesg = bot.send_message(message.chat.id, "😥 Неправильный формат\nВведите еще раз:")
+        bot.register_next_step_handler(mesg, lambda m: get_pred_day(message=m, user_id=user_id, model=model))
+    else:
+        if model == "catboost":
+            df = db.get_df(user_id=user_id)
+
+            if 0.08 * df.shape[0] < 1:
+                bot.send_message(message.chat.id, "Слишком мало информации о расходах :(")
+                bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
+                return
+
+            str_start_date = pd.Timestamp(message.date, unit='s', tz='US/Pacific').strftime('%Y-%m-%d')
+            pd_dates = pd.DataFrame(pd.date_range(str_start_date, freq=datetime.timedelta(seconds=86400), periods=int(message.text)))
+            pd_dates.columns = ['date']
+
+            res = predict.catboost(df=df, new_df=pd_dates)
+
+            file = open(f"files/{message.chat.id}/predict{str_start_date}.txt", "w")
+            for i, row in res.iterrows():
+                file.write(f'{row["date"].date().strftime("%d-%m-%Y")} | {round(row["sum"], 3)}\n')
+            file.close()
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict{str_start_date}.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict{str_start_date}.txt")
+
+            plt.scatter(res['date'], res['sum'], c="red", linestyle="dotted")
+            plt.savefig(f"files/{message.chat.id}/image.jpg")
+            plt.clf()
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            os.remove(f"files/{message.chat.id}/image.jpg")
+        elif model == "lama":
+            df = db.get_df(user_id=user_id)
+            str_start_date = pd.Timestamp(message.date, unit='s', tz='US/Pacific').strftime('%Y-%m-%d')
+            pd_dates = pd.DataFrame(
+                pd.date_range(str_start_date, freq=datetime.timedelta(seconds=86400), periods=int(message.text)))
+            pd_dates.columns = ['date']
+            res = predict.lama(df=df, new_df=pd_dates)
+
+            file = open(f"files/{message.chat.id}/predict{str_start_date}.txt", "w")
+            for i, row in res.iterrows():
+                file.write(f'{row["date"].date().strftime("%d-%m-%Y")} | {round(row["sum"], 3)}\n')
+            file.close()
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict{str_start_date}.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict{str_start_date}.txt")
+
+            plt.scatter(res['date'], res['sum'], c="red", linestyle="dotted")
+            plt.savefig(f"files/{message.chat.id}/image.jpg")
+            plt.clf()
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            os.remove(f"files/{message.chat.id}/image.jpg")
+
+        elif model == "arima":
+            df = db.get_df(user_id=user_id)
+            df = df[['date', 'sum']]
+            print(df)
+            # df.columns = ['date', 'sum']
+            df['date'] = pd.to_datetime(df['date'])
+            grouped_df = df.groupby('date')['sum'].sum().reset_index()
+            grouped_df = grouped_df.set_index('date')
+            df = grouped_df.resample('D').fillna(method='ffill')
+            df = df.reset_index()
+            print(str(message.date))
+            start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').
+                                        strftime('%Y-%m-%d')).date()
+            # print(start_date, type(start_date))
+            days = int(message.text)
+
+            # если использовать statsmodels
+            # print(start_date, end_date)
+            # df_train = df[df['date'] < start_date]
+            # df_test = df[df['date'] >= start_date]
+            # res = predict.arima(df=df, start_date=start_date, end_date=end_date, p=2, q=2, d=0)
+            # print(res)
+            # plt.figure(res)
+            # plt.savefig(f"files/{message.chat.id}/image.jpg")
+            # plt.clf()
+            # bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            # os.remove(f"files/{message.chat.id}/image.jpg")
+
+            # если использовать etna
+            res, train_df = predict.arima_etna(df=df, days=days, p=10, q=0, d=0)
+            print(train_df)
+            print(res)
+            dates = pd.date_range(start_date, freq=datetime.timedelta(days=1), periods=len(res['target']))
+            file = open(f"files/{message.chat.id}/predict{start_date}.txt", "w")
+            for i, row in res.iterrows():
+                file.write(f'{dates[i].date().strftime("%d-%m-%Y")} | {round(row["target"], 3)}\n')
+            file.close()
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict{start_date}.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict{start_date}.txt")
+
+            plt.plot(train_df['timestamp'], train_df['target'], c="rosybrown", linestyle=":")
+            plt.plot(res['timestamp'], res['target'], c="cornflowerblue", linestyle="-")
+            plt.savefig(f"files/{message.chat.id}/image.jpg")
+            plt.clf()
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            os.remove(f"files/{message.chat.id}/image.jpg")
+
+        elif model == "prophet":
+            df = db.get_df(user_id=user_id)
+            df = df[['date', 'sum']]
+            # df.columns = ['date', 'sum']
+            df['date'] = pd.to_datetime(df['date'])
+            grouped_df = df.groupby('date')['sum'].sum().reset_index()
+            grouped_df = grouped_df.set_index('date')
+            df = grouped_df.resample('D').fillna(method='ffill')
+            df = df.reset_index()
+            start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').
+                                        strftime('%Y-%m-%d')).date()
+            days = int(message.text)
+
+            # если использовать etna
+            res, train_df = predict.prophet_etna(df=df, days=days)
+            dates = pd.date_range(start_date, freq=datetime.timedelta(days=1), periods=len(res['target']))
+            file = open(f"files/{message.chat.id}/predict{start_date}.txt", "w")
+            for i, row in res.iterrows():
+                file.write(f'{dates[i].date().strftime("%d-%m-%Y")} | {round(row["target"], 3)}\n')
+            file.close()
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict{start_date}.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict{start_date}.txt")
+
+            plt.plot(train_df['timestamp'], train_df['target'], c="rosybrown", linestyle=":")
+            plt.plot(res['timestamp'], res['target'], c="cornflowerblue", linestyle="-")
+            plt.savefig(f"files/{message.chat.id}/image.jpg")
+            plt.clf()
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            os.remove(f"files/{message.chat.id}/image.jpg")
+        bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
+
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
     if call.message:
+        bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
         if call.data == "menu":
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="📌 Меню",
                                   reply_markup=menu_key())
@@ -482,6 +629,23 @@ def callback_query(call):
             db.erase_reminder(notification_id=int(call.data[len("remind_del_"):]))
             bot.send_message(call.message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
+        if call.data == "predict":
+            key = types.InlineKeyboardMarkup()
+            but_1 = types.InlineKeyboardButton(text="catboost", callback_data="predict_catboost")
+            but_2 = types.InlineKeyboardButton(text="lama", callback_data="predict_lama")
+            but_3 = types.InlineKeyboardButton(text="arima", callback_data="predict_arima")
+            but_4 = types.InlineKeyboardButton(text="prophet", callback_data="predict_prophet")
+            but_5 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
+            key.add(but_1, but_2, but_3, but_4, but_5)
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                  text="Выберите модель:",
+                                  reply_markup=key)
+
+        if call.data[:len("predict_")] == "predict_":
+            mesg = bot.send_message(call.message.chat.id, "Введите количество дней для предсказания")
+            bot.register_next_step_handler(mesg,
+                                           lambda m: get_pred_day(message=m, user_id=call.from_user.id, model=call.data[len("predict_"):]))
+
 
 @bot.message_handler(content_types=["text"])
 def messages(message):
@@ -617,5 +781,4 @@ def main():
 if __name__ == '__main__':
     # TODO: нужен ли тут flag_drop=True ?
     db.init_db(flag_drop=False)
-
     main()
