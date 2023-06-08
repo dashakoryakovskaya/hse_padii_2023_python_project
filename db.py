@@ -4,6 +4,7 @@ import pandas as pd
 from prettytable import from_db_cursor
 from dateutil.relativedelta import relativedelta
 import datetime
+import random
 
 __connection = None
 
@@ -56,7 +57,7 @@ def add_real_data(conn, user_id, name_of_file):
     total_sum = df_resampled['sum'].sum()
     c.execute(f'UPDATE balance SET total = (SELECT total FROM balance WHERE user_id={user_id}) - {total_sum} WHERE user_id={user_id};')
 
-    df_resampled["type"] = 1
+    df_resampled["type"] = random.randint(1, 10)
     df_resampled.insert(loc=0, column='user_id', value=user_id)
     df = df_resampled
     df.index.rename('id', inplace=True)
@@ -183,7 +184,7 @@ def init_db(conn, flag_drop: bool = False):
 
     conn.commit()
     add_real_data(user_id=219102395, name_of_file='personal_transactions_bot')
-    # add_real_data(user_id=1067952257, name_of_file='personal_transactions_bot')
+    add_real_data(user_id=1067952257, name_of_file='personal_transactions_bot')
 
 
 def add_default_categories(conn, user_id: int):

@@ -11,9 +11,6 @@ import os
 
 from threading import Thread
 
-import requests
-import json
-
 import datetime
 import time
 # from notifiers import get_notifier
@@ -183,52 +180,6 @@ def add_date(message, user_id, type, sum, ex_in):
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
-# api get image from html
-instructions = {
-    'parts': [
-        {
-            'html': 'document'
-        }
-    ],
-    'output': {
-        'type': 'image',
-        'format': 'jpg',
-        #'width': 200
-        'dpi': 300
-    }
-}
-
-
-def html_to_jpg(chat_id, user_id, type, ex_in, all_period=False, data_start='', data_end=''):
-    with open(f'files/{chat_id}/index.html', 'w') as ind:
-        ind.write(
-            f'<pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string()}</pre>')
-    response = requests.request(
-        'POST',
-        'https://api.pspdfkit.com/build',
-        headers={
-            'Authorization': 'Bearer pdf_live_x1L2pZwnNLoGTXSfb7gQUs4VRihmjErNYVundnIdomy'
-        },
-        files={
-            'document': open(f'files/{chat_id}/index.html', 'rb')
-        },
-        data={
-            'instructions': json.dumps(instructions)
-        },
-        stream=True
-    )
-    if response.ok:
-        with open(f'files/{chat_id}/image.jpg', 'wb') as fd:
-            for chunk in response.iter_content(chunk_size=8096):
-                fd.write(chunk)
-    else:
-        print(response.text)
-        exit()
-    bot.send_photo(chat_id, photo=open(f'files/{chat_id}/image.jpg', 'rb'))
-    os.remove(f'files/{chat_id}/index.html')
-    os.remove(f'files/{chat_id}/image.jpg')
-
-
 def get_data_period(message, user_id, type, ex_in, sum_all, plot):
     Path(f'files/{message.chat.id}').mkdir(parents=True, exist_ok=True)
     if message.text == "Весь период":
@@ -237,7 +188,7 @@ def get_data_period(message, user_id, type, ex_in, sum_all, plot):
             plt.pie(y, labels=lables)
             plt.savefig(f"files/{message.chat.id}/image.jpg")
             plt.clf()
-            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'), reply_markup=types.ReplyKeyboardRemove())
             os.remove(f"files/{message.chat.id}/image.jpg")
         else:
             sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=True)
@@ -259,7 +210,7 @@ def get_data_period(message, user_id, type, ex_in, sum_all, plot):
             plt.pie(y, labels=lables)
             plt.savefig(f"files/{message.chat.id}/image.jpg")
             plt.clf()
-            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'), reply_markup=types.ReplyKeyboardRemove())
             os.remove(f"files/{message.chat.id}/image.jpg")
         else:
             sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=False, data_start=data_start,
