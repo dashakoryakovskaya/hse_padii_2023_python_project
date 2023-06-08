@@ -32,6 +32,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('agg')
 
+import seaborn as sns
+custom_params = {'patch.force_edgecolor': False}
+sns.set_theme(rc=custom_params)
+
 tconv = lambda x: time.strftime("%Y-%m-%d", time.localtime(x))
 tconv_time = lambda x: time.strftime("%H:%M", time.localtime(x))
 
@@ -225,13 +229,21 @@ def html_to_jpg(chat_id, user_id, type, ex_in, all_period=False, data_start='', 
     os.remove(f'files/{chat_id}/image.jpg')
 
 
-def get_data_period(message, user_id, type, ex_in, sum_all):
+def get_data_period(message, user_id, type, ex_in, sum_all, plot):
     Path(f'files/{message.chat.id}').mkdir(parents=True, exist_ok=True)
     if message.text == "Весь период":
-        sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=True)
-        bot.send_message(message.chat.id, text="Сумма:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
-        if sum_all == "all":
-            html_to_jpg(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, all_period=True)
+        if plot == "pie":
+            [y, lables] = db.get_sum_group(user_id=user_id, ex_in=ex_in, all_period=True, data_start='', data_end='')
+            plt.pie(y, labels=lables)
+            plt.savefig(f"files/{message.chat.id}/image.jpg")
+            plt.clf()
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            os.remove(f"files/{message.chat.id}/image.jpg")
+        else:
+            sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=True)
+            bot.send_message(message.chat.id, text="Сумма:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
+            if sum_all == "all":
+                html_to_jpg(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, all_period=True)
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
         return
     if len(message.text) != 21 or is_incorrect_date_format(message.text[:10]) or is_incorrect_date_format(
@@ -242,11 +254,19 @@ def get_data_period(message, user_id, type, ex_in, sum_all):
     else:
         data_start = message.text[:10]
         data_end = message.text[11:]
-        sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=False, data_start=data_start,
-                         data_end=data_end)
-        bot.send_message(message.chat.id, text="Сумма:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
-        if sum_all == "all":
-            html_to_jpg(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, data_start=data_start, data_end=data_end)
+        if plot == "pie":
+            [y, lables] = db.get_sum_group(user_id=user_id, ex_in=ex_in, all_period=False, data_start=data_start, data_end=data_end)
+            plt.pie(y, labels=lables)
+            plt.savefig(f"files/{message.chat.id}/image.jpg")
+            plt.clf()
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            os.remove(f"files/{message.chat.id}/image.jpg")
+        else:
+            sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=False, data_start=data_start,
+                             data_end=data_end)
+            bot.send_message(message.chat.id, text="Сумма:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
+            if sum_all == "all":
+                html_to_jpg(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, data_start=data_start, data_end=data_end)
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
@@ -471,8 +491,10 @@ def callback_query(call):
             but_1 = types.InlineKeyboardButton(text="💰 Баланс", callback_data="data_balance")
             but_2 = types.InlineKeyboardButton(text="📉 Расходы", callback_data="data_ex")
             but_3 = types.InlineKeyboardButton(text="📈 Доходы", callback_data="data_in")
-            but_4 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
-            key.add(but_1, but_2, but_3, but_4)
+            but_4 = types.InlineKeyboardButton(text="📊 Расходы - диаграмма", callback_data="data_ex_pie")
+            but_5 = types.InlineKeyboardButton(text="📊 Доходы - диаграмма", callback_data="data_in_pie")
+            but_6 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
+            key.add(but_1, but_2, but_3, but_4, but_5, but_6)
             # bot.send_message(chat_id=call.message.chat.id, text="Выберите категорию:", reply_markup=key)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                   text="📎 Выберите категорию:", reply_markup=key)
@@ -502,7 +524,7 @@ def callback_query(call):
                                   text="Выберите тип:",
                                   reply_markup=key)
 
-        if call.data.count("_") == 3 and (
+        if call.data == "data_ex_pie" or call.data == "data_in_pie" or call.data.count("_") == 3 and (
                 call.data[:len("data_ex_")] == "data_ex_" or call.data[:len("data_in_")] == "data_in_") and (
                 call.data[-4:] == "_sum" or call.data[-4:] == "_all"):
             bot.answer_callback_query(call.id, "Введите период")
@@ -519,7 +541,7 @@ def callback_query(call):
                                                                                     "_")] == "all" else call.data[
                                                                                                         len("data_ex_"):call.data.rfind(
                                                                                                             "_")],
-                                                                     ex_in=call.data[5:7], sum_all=call.data[-3:]))
+                                                                     ex_in=call.data[5:7], sum_all=call.data[-3:], plot="pie" if call.data[8:] == "pie" else ""))
 
         if call.data == "cards":
             key = types.InlineKeyboardMarkup()
