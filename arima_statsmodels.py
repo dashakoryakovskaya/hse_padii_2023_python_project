@@ -47,8 +47,7 @@ def add_money_transfer(conn, user_id: int, sum: int, type: int, date: int):
 
 
 def gen(t):
-    return 1000 + 100 * math.sin(100 + 100 * math.cos(t / 150000)) + ((-1) ** (random.randrange(1, 3))) * random.\
-        randrange(10)
+    return 1000 + 100 * math.sin(t / 150000) + 5 * ((-1) ** (random.randrange(1, 3))) * random.randrange(10)
 
 
 def generate():
@@ -56,7 +55,7 @@ def generate():
     # 1583058006
     dt = 86400
     # секунд в 12 часах
-    for i in range(100) :
+    for i in range(100):
         t += dt
         s = gen(t)
         add_money_transfer(user_id=0, sum=s, type=0, date=t)
@@ -110,7 +109,7 @@ def arima_model_sin():
     plt.show()
 
 
-def arima_model_real():
+def arima_model_real_with_finding():
     all_data = pd.read_csv('indexed_preformatted.csv')
     sums = all_data[all_data.columns[-1]].values
     dates = all_data[all_data.columns[-2]].values
@@ -149,7 +148,7 @@ def arima_model_real():
     plt.show()
 
 
-if __name__ == '__main__':
+def arima_model_real():
     all_data = pd.read_csv('personal_transactions.csv')
     # print(all_data.head())
     sums = []
@@ -187,3 +186,7 @@ if __name__ == '__main__':
     plt.scatter(pd_dates, normal_sums, c="red", linestyle="dotted")
     plt.xlim('2018-01-01', '2019-05-01')
     plt.show()
+
+
+if __name__ == '__main__':
+    arima_model_sin()

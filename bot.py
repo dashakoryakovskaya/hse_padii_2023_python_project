@@ -107,7 +107,7 @@ def menu_key():
     but_3 = types.InlineKeyboardButton(text="📃 Статистика", callback_data="data")
     but_4 = types.InlineKeyboardButton(text="✔️ Дисконтные карты", callback_data="cards")
     but_5 = types.InlineKeyboardButton(text="🔔 Напоминания", callback_data="remind")
-    but_6 = types.InlineKeyboardButton(text="Предсказания расходов", callback_data="predict")
+    but_6 = types.InlineKeyboardButton(text="🪄Предсказания расходов", callback_data="predict")
     key.add(but_1, but_2, but_3, but_4, but_5, but_6)
     return key
 
@@ -343,7 +343,6 @@ def get_pred_day(message, user_id, model):
             print(str(message.date))
             start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').
                                         strftime('%Y-%m-%d')).date()
-            # print(start_date, type(start_date))
             days = int(message.text)
 
             # если использовать statsmodels
@@ -360,9 +359,9 @@ def get_pred_day(message, user_id, model):
 
             # если использовать etna
             res, train_df = predict.arima_etna(df=df, days=days, p=10, q=0, d=0)
-            print(train_df)
-            print(res)
-            dates = pd.date_range(start_date, freq=datetime.timedelta(days=1), periods=len(res['target']))
+            if len(train_df) > 31:
+                train_df = train_df[-30:]
+            dates = pd.date_range(start_date, freq=datetime.timedelta(days=4), periods=len(res['target']))
             file = open(f"files/{message.chat.id}/predict{start_date}.txt", "w")
             for i, row in res.iterrows():
                 file.write(f'{dates[i].date().strftime("%d-%m-%Y")} | {round(row["target"], 3)}\n')
@@ -380,7 +379,6 @@ def get_pred_day(message, user_id, model):
         elif model == "prophet":
             df = db.get_df(user_id=user_id)
             df = df[['date', 'sum']]
-            # df.columns = ['date', 'sum']
             df['date'] = pd.to_datetime(df['date'])
             grouped_df = df.groupby('date')['sum'].sum().reset_index()
             grouped_df = grouped_df.set_index('date')
@@ -391,7 +389,40 @@ def get_pred_day(message, user_id, model):
             days = int(message.text)
 
             # если использовать etna
-            res, train_df = predict.prophet_etna(df=df, days=days)
+            res, train_df = predict.prophet_etna(df=df, days=days, real_dates=False)
+            if len(train_df) > 31:
+                train_df = train_df[-30:]
+            dates = pd.date_range(start_date, freq=datetime.timedelta(days=4), periods=len(res['target']))
+            file = open(f"files/{message.chat.id}/predict{start_date}.txt", "w")
+            for i, row in res.iterrows():
+                file.write(f'{dates[i].date().strftime("%d-%m-%Y")} | {round(row["target"], 3)}\n')
+            file.close()
+            bot.send_document(message.chat.id, open(f"files/{message.chat.id}/predict{start_date}.txt", "r"))
+            os.remove(f"files/{message.chat.id}/predict{start_date}.txt")
+
+            plt.plot(train_df['timestamp'], train_df['target'], c="rosybrown", linestyle=":")
+            plt.plot(res['timestamp'], res['target'], c="cornflowerblue", linestyle="-")
+            plt.savefig(f"files/{message.chat.id}/image.jpg")
+            plt.clf()
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
+            os.remove(f"files/{message.chat.id}/image.jpg")
+
+        elif model == "prophet_2":
+            df = db.get_df(user_id=user_id)
+            df = df[['date', 'sum']]
+            df['date'] = pd.to_datetime(df['date'])
+            grouped_df = df.groupby('date')['sum'].sum().reset_index()
+            grouped_df = grouped_df.set_index('date')
+            df = grouped_df.resample('D').fillna(method='ffill')
+            df = df.reset_index()
+            start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').
+                                        strftime('%Y-%m-%d')).date()
+            days = int(message.text)
+
+            # если использовать etna
+            res, train_df = predict.prophet_etna(df=df, days=days, real_dates=True)
+            if len(train_df) > 31:
+                train_df = train_df[-30:]
             dates = pd.date_range(start_date, freq=datetime.timedelta(days=1), periods=len(res['target']))
             file = open(f"files/{message.chat.id}/predict{start_date}.txt", "w")
             for i, row in res.iterrows():
@@ -406,6 +437,7 @@ def get_pred_day(message, user_id, model):
             plt.clf()
             bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'))
             os.remove(f"files/{message.chat.id}/image.jpg")
+
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
@@ -607,12 +639,22 @@ def callback_query(call):
             but_1 = types.InlineKeyboardButton(text="catboost", callback_data="predict_catboost")
             but_2 = types.InlineKeyboardButton(text="lama", callback_data="predict_lama")
             but_3 = types.InlineKeyboardButton(text="arima", callback_data="predict_arima")
-            but_4 = types.InlineKeyboardButton(text="prophet", callback_data="predict_prophet")
-            but_5 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
-            key.add(but_1, but_2, but_3, but_4, but_5)
+            but_4 = types.InlineKeyboardButton(text="prophet-1", callback_data="predict_prophet")
+            but_5 = types.InlineKeyboardButton(text="prophet-2", callback_data="predict_prophet_2")
+            but_6 = types.InlineKeyboardButton(text="📌 Меню", callback_data="menu")
+            key.add(but_1, but_2, but_3, but_4, but_5, but_6)
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                  text="Выберите модель:",
-                                  reply_markup=key)
+                                  text="Описание моделей:\n\n"
+                                       "🤌*catboost*\nподходит для предсказаний на длительный период\n\n"
+                                       "🤌*lama*\nвысокая точность предсказания больших трат\n\n"
+                                       "🤌*arima*\nподходит для предсказания на небольшой период, "
+                                       "предказывается каждый четвертый день, виден характер трат\n\n"
+                                       "🤌*prophet-1*\nподходит для предсказания тренда трат, предказывается "
+                                       "каждый четвертый день\n\n"
+                                       "🤌*prophet-2*\nподходит для предсказания тренда трат, предказывается"
+                                       " каждый день\n"
+                                       "\nВыберите модель:",
+                                  reply_markup=key, parse_mode="Markdown")
 
         if call.data[:len("predict_")] == "predict_":
             mesg = bot.send_message(call.message.chat.id, "Введите количество дней для предсказания")
