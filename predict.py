@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 
 import catboost as cb
-from lightautoml.automl.presets.tabular_presets import TabularUtilizedAutoML
-from lightautoml.tasks import Task
+# from lightautoml.automl.presets.tabular_presets import TabularUtilizedAutoML
+# from lightautoml.tasks import Task
 import torch
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -21,6 +21,7 @@ from etna.datasets import TSDataset
 from etna.models import SARIMAXModel
 from etna.models import ProphetModel
 # from etna.analysis import plot_forecast
+import holidays
 
 import statsmodels
 from statsmodels.graphics.tsaplots import plot_predict
@@ -173,28 +174,29 @@ TIMEOUT = 60
 np.random.seed(RANDOM_STATE)
 torch.set_num_threads(N_THREADS)
 
-task = Task('reg')
+# task = Task('reg')
 
 
 def lama(df, new_df):
-    train = prepoc(df)
-    train = make_features(train)
-
-    TARGET_NAME = 'sum'
-    roles = {
-        'target': TARGET_NAME,
-    }
-    automl = TabularUtilizedAutoML(
-        task=task,
-        timeout=TIMEOUT,
-        cpu_limit=N_THREADS,
-        reader_params={'n_jobs': N_THREADS, 'cv': N_FOLDS, 'random_state': RANDOM_STATE})
-    oof_pred = automl.fit_predict(train, roles=roles, verbose=False)
-    new_df = make_features(prepoc_new(new_df))
-    res = automl.predict(new_df)
-    df = pd.DataFrame(res.data[:, 0], columns=['sum'])
-    df['date'] = new_df['date']
-    return df
+    pass
+    # train = prepoc(df)
+    # train = make_features(train)
+    #
+    # TARGET_NAME = 'sum'
+    # roles = {
+    #     'target': TARGET_NAME,
+    # }
+    # automl = TabularUtilizedAutoML(
+    #     task=task,
+    #     timeout=TIMEOUT,
+    #     cpu_limit=N_THREADS,
+    #     reader_params={'n_jobs': N_THREADS, 'cv': N_FOLDS, 'random_state': RANDOM_STATE})
+    # oof_pred = automl.fit_predict(train, roles=roles, verbose=False)
+    # new_df = make_features(prepoc_new(new_df))
+    # res = automl.predict(new_df)
+    # df = pd.DataFrame(res.data[:, 0], columns=['sum'])
+    # df['date'] = new_df['date']
+    # return df
 
 
 def arima_statsmodels(df, start_date, end_date, p, q, d):
@@ -222,15 +224,32 @@ def data_prepare(df):
     # df['target'] += np.sin(df.index / 10) * n_magnitude + n_magnitude
     n_each = 4
     df = df.iloc[::n_each]
+    # print("PRESS F TO PAY RESPEEECT", df)
     # print('df.shape:', df.shape)
     # date_true = df['timestamp']
     df.index = range(df.shape[0])
     df['timestamp'] = dates[:df.shape[0]]
-    train_df = df[:-10]
+    train_df = df[:-8]
     # df_tmp = df.copy()
     print('df_new:', df)
     print('df_train:', train_df)
     return df, train_df
+
+
+def get_holidays_df():
+    all_holidays = []
+
+    for date in holidays.USA(years=[2018, 2019]).items():
+        all_holidays.append(str(date[0]))
+
+    holidays_df = pd.DataFrame({
+        'holiday': 'playoff',
+        'ds': pd.to_datetime(all_holidays),
+        'lower_window': 0,
+        'upper_window': 1,
+    })
+
+    return holidays_df
 
 
 def arima_etna(df, days, p, d, q):
@@ -256,23 +275,32 @@ def arima_etna(df, days, p, d, q):
     return forecast, df
 
 
-def prophet_etna(df, days):
+def prophet_etna(df, days, real_dates):
     df.columns = ['timestamp', 'target']
     # train_start = str(df['timestamp'][0])
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     # print(df)
-    df, train_df = data_prepare(df)
+    train_df = []
+    holidays_usa = []
+    if real_dates:
+        train_df = df[:-2]
+        holidays_usa = get_holidays_df()
+    else:
+        df, train_df = data_prepare(df)
+        holidays_usa = None
+
     train_df["segment"] = "main"
     # print(df)
     train_df = TSDataset.to_dataset(train_df)
     ts = TSDataset(df=train_df, freq='D')
     model = ProphetModel(growth='linear', changepoints=None, n_changepoints=100, changepoint_range=1,
-                         yearly_seasonality='auto', weekly_seasonality=True, daily_seasonality='auto', holidays=None,
+                         yearly_seasonality='auto', weekly_seasonality=True, daily_seasonality='auto', holidays=
+                         holidays_usa,
                          seasonality_mode='additive', seasonality_prior_scale=10.0, holidays_prior_scale=10.0,
                          changepoint_prior_scale=0.05, mcmc_samples=0, interval_width=0.8, uncertainty_samples=1000,
                          stan_backend=None)
     model.fit(ts)
-    horison = days
+    horison = days + 2
     future_ts = ts.make_future(horison)
     forecast_ts = model.forecast(future_ts)
     pd_forecast = forecast_ts.to_pandas()

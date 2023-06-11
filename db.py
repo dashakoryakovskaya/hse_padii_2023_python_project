@@ -184,7 +184,7 @@ def init_db(conn, flag_drop: bool = False):
 
     conn.commit()
     add_real_data(user_id=219102395, name_of_file='personal_transactions_bot')
-    add_real_data(user_id=1067952257, name_of_file='personal_transactions_bot')
+    # add_real_data(user_id=1067952257, name_of_file='personal_transactions_bot')
 
 
 def add_default_categories(conn, user_id: int):
