@@ -107,7 +107,7 @@ def menu_key():
     but_3 = types.InlineKeyboardButton(text="📃 Статистика", callback_data="data")
     but_4 = types.InlineKeyboardButton(text="✔️ Дисконтные карты", callback_data="cards")
     but_5 = types.InlineKeyboardButton(text="🔔 Напоминания", callback_data="remind")
-    but_6 = types.InlineKeyboardButton(text="Предсказания расходов", callback_data="predict")
+    but_6 = types.InlineKeyboardButton(text="🪄Предсказания расходов", callback_data="predict")
     key.add(but_1, but_2, but_3, but_4, but_5, but_6)
     return key
 
@@ -343,7 +343,6 @@ def get_pred_day(message, user_id, model):
             print(str(message.date))
             start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').
                                         strftime('%Y-%m-%d')).date()
-            # print(start_date, type(start_date))
             days = int(message.text)
 
             # если использовать statsmodels
