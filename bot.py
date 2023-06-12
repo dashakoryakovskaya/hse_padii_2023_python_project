@@ -43,9 +43,9 @@ bot = telebot.TeleBot(config.token)
 
 def html_to_jpg(chat_id, user_id, type, ex_in, all_period=False, data_start='', data_end=''):
     with open(f'files/{chat_id}/statistic.html', 'w') as ind:
-        print(db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string())
+        # print(db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string())
         ind.write(
-            f'<pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string()}</pre>')
+            f'<meta charset="Windows-1251" /><pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string()}</pre>')
     bot.send_document(chat_id, open(f'files/{chat_id}/statistic.html', 'rb'))
     os.remove(f'files/{chat_id}/statistic.html')
 
@@ -152,15 +152,14 @@ def add_expenses_or_incomes_menu(message, user_id, type, ex_in):
                                        lambda m: add_expenses_or_incomes_menu(message=m, user_id=user_id,
                                                                               type=type, ex_in=ex_in))
 
-    # TODO: проверять длину месяца (апрель - 30 и тд)
 
 
 def is_incorrect_date_format(string):
     try:
         valid_date = time.strptime(string, '%Y-%m-%d')
     except ValueError:
-        return False
-    return True
+        return True
+    return False
     '''return len(string) != 10 or string[4] != "-" or string[7] != "-" or not string[0:4].isdigit() \
         or not string[5:7].isdigit() or not string[8:10].isdigit() \
         or (12 < int(string[5:7]) or int(string[5:7]) < 1) \
@@ -711,7 +710,7 @@ def messages(message):
             db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={message.from_user.id};")))
     if message.text[0:2] == 'qr':
         bot.send_message(message.chat.id,
-                         'Отправь мне фотографию qr кода')  # TODO: добавить отправление не картинкой, а файлом
+                         'Отправь мне фотографию qr кода')
         bot.register_next_step_handler(message, qr_code_reader)
 
 
