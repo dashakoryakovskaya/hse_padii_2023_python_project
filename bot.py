@@ -45,7 +45,7 @@ def html_to_jpg(chat_id, user_id, type, ex_in, all_period=False, data_start='', 
     with open(f'files/{chat_id}/statistic.html', 'w') as ind:
         print(db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string())
         ind.write(
-            f'<meta charset="Windows-1251" /><pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string()}</pre>')
+            f'<pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string()}</pre>')
     bot.send_document(chat_id, open(f'files/{chat_id}/statistic.html', 'rb'))
     os.remove(f'files/{chat_id}/statistic.html')
 
@@ -156,10 +156,15 @@ def add_expenses_or_incomes_menu(message, user_id, type, ex_in):
 
 
 def is_incorrect_date_format(string):
-    return len(string) != 10 or string[4] != "-" or string[7] != "-" or not string[0:4].isdigit() \
+    try:
+        valid_date = time.strptime(string, '%Y-%m-%d')
+    except ValueError:
+        return False
+    return True
+    '''return len(string) != 10 or string[4] != "-" or string[7] != "-" or not string[0:4].isdigit() \
         or not string[5:7].isdigit() or not string[8:10].isdigit() \
         or (12 < int(string[5:7]) or int(string[5:7]) < 1) \
-        or (31 < int(string[8:10]) or int(string[8:10]) < 1)
+        or (31 < int(string[8:10]) or int(string[8:10]) < 1) '''
 
 
 def add_date(message, user_id, type, sum, ex_in):
@@ -494,7 +499,6 @@ def callback_query(call):
                                                                                   ex_in=call.data[:2]))
 
         if call.data == "data":
-            # TODO: Продумать статистику для доходов и расходов (период, категории и тд)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="💰 Баланс", callback_data="data_balance")
             but_2 = types.InlineKeyboardButton(text="📉 Расходы", callback_data="data_ex")
@@ -712,7 +716,6 @@ def messages(message):
 
 
 def qr_get_phone(message, qr_code, user_id, type):
-    # TODO проверить корректность введенного номера и результата запроса
     phone = str(message.text)
     if len(phone) != 12 or phone[0:2] != "+7" or not (phone[2:].isdigit()):
         mesg = bot.send_message(message.chat.id, "😥 Неправильный формат '+7'\nВведите еще раз:")
