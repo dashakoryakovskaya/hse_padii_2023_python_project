@@ -1,6 +1,7 @@
 import sqlite3
 import bot
 import pandas as pd
+import numpy as np
 from prettytable import from_db_cursor
 from dateutil.relativedelta import relativedelta
 import datetime
@@ -57,7 +58,8 @@ def add_real_data(conn, user_id, name_of_file):
     total_sum = df_resampled['sum'].sum()
     c.execute(f'UPDATE balance SET total = (SELECT total FROM balance WHERE user_id={user_id}) - {total_sum} WHERE user_id={user_id};')
 
-    df_resampled["type"] = random.randint(1, 10)
+    df_resampled["type"] = np.random.randint(1, 10, size=(df_resampled.shape[0], 1))
+    # df_resampled["type"] = 1
     df_resampled.insert(loc=0, column='user_id', value=user_id)
     df = df_resampled
     df.index.rename('id', inplace=True)

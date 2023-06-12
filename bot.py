@@ -311,6 +311,13 @@ def get_pred_day(message, user_id, model):
             os.remove(f"files/{message.chat.id}/image.jpg")
         elif model == "lama":
             df = db.get_df(user_id=user_id)
+
+            if 0.2 * df.shape[0] < 1:
+                bot.send_message(message.chat.id, "Слишком мало информации о расходах :(")
+                bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
+                return
+
+
             str_start_date = pd.Timestamp(message.date, unit='s', tz='US/Pacific').strftime('%Y-%m-%d')
             pd_dates = pd.DataFrame(
                 pd.date_range(str_start_date, freq=datetime.timedelta(seconds=86400), periods=int(message.text)))
