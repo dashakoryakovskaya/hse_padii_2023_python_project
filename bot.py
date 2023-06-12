@@ -107,7 +107,7 @@ def menu_key():
     but_3 = types.InlineKeyboardButton(text="📃 Статистика", callback_data="data")
     but_4 = types.InlineKeyboardButton(text="✔️ Дисконтные карты", callback_data="cards")
     but_5 = types.InlineKeyboardButton(text="🔔 Напоминания", callback_data="remind")
-    but_6 = types.InlineKeyboardButton(text="🪄Предсказания расходов", callback_data="predict")
+    but_6 = types.InlineKeyboardButton(text="🪄 Предсказания расходов", callback_data="predict")
     key.add(but_1, but_2, but_3, but_4, but_5, but_6)
     return key
 
@@ -128,11 +128,16 @@ def start_message(message):
     db.add_user(user_id=message.from_user.id, name=message.from_user.username)
 
 
-# TODO: нужна /stop команда?
-@bot.message_handler(commands=['stop'])
-def stop(message):
-    bot.send_message(message.chat.id, "До встречи!")
-    bot.stop_polling()
+@bot.message_handler(commands=['help'])
+def start_message(message):
+    bot.clear_step_handler_by_chat_id(chat_id=message.chat.id)
+    bot.send_message(message.chat.id, "📉 Расходы - добавление расходов \n"
+                                      "📈 Доходы - добавление доходов \n"
+                                      "📃 Статистика - баланс, все операции, диаграмма по категориям \n"
+                                      "✔️ Дисконтные карты - добавление, получение и удаление карт \n"
+                                      "🔔 Напоминания - добавление, просмотр и удаление напоминаний \n"
+                                      "🪄 Предсказания расходов - предсказание расходов с помощью методов машинного обучения", reply_markup=menu_key())
+    db.add_user(user_id=message.from_user.id, name=message.from_user.username)
 
 
 def add_expenses_or_incomes_menu(message, user_id, type, ex_in):
