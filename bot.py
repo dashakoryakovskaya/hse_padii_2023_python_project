@@ -347,6 +347,12 @@ def get_pred_day(message, user_id, model):
             grouped_df = grouped_df.set_index('date')
             df = grouped_df.resample('D').fillna(method='ffill')
             df = df.reset_index()
+
+            if df.shape[0] < 40:
+                bot.send_message(message.chat.id, "Слишком мало информации о расходах :(")
+                bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
+                return
+
             print(str(message.date))
             start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').
                                         strftime('%Y-%m-%d')).date()
@@ -391,6 +397,12 @@ def get_pred_day(message, user_id, model):
             grouped_df = grouped_df.set_index('date')
             df = grouped_df.resample('D').fillna(method='ffill')
             df = df.reset_index()
+
+            if df.shape[0] < 40:
+                bot.send_message(message.chat.id, "Слишком мало информации о расходах :(")
+                bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
+                return
+
             start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').
                                         strftime('%Y-%m-%d')).date()
             days = int(message.text)
@@ -422,6 +434,12 @@ def get_pred_day(message, user_id, model):
             grouped_df = grouped_df.set_index('date')
             df = grouped_df.resample('D').fillna(method='ffill')
             df = df.reset_index()
+
+            if df.shape[0] < 10:
+                bot.send_message(message.chat.id, "Слишком мало информации о расходах :(")
+                bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
+                return
+
             start_date = pd.to_datetime(pd.Timestamp(message.date, unit='s', tz='US/Pacific').
                                         strftime('%Y-%m-%d')).date()
             days = int(message.text)
