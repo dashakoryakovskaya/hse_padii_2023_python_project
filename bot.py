@@ -41,11 +41,11 @@ STOP_BOT_FLAG = False
 bot = telebot.TeleBot(config.token)
 
 
-def html_to_jpg(chat_id, user_id, type, ex_in, all_period=False, data_start='', data_end=''):
+def html_statistic(chat_id, user_id, type, ex_in, all_period=False, data_start='', data_end=''):
     with open(f'files/{chat_id}/statistic.html', 'w') as ind:
         # print(db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string())
         ind.write(
-            f'<meta charset="Windows-1251" /><pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string()}</pre>')
+            f'<meta charset="utf-8" /><pre>{db.get_all_statistic(user_id=user_id, type=type, ex_in=ex_in, all_period=all_period, data_start=data_start, data_end=data_end).get_string()}</pre>')
     bot.send_document(chat_id, open(f'files/{chat_id}/statistic.html', 'rb'))
     os.remove(f'files/{chat_id}/statistic.html')
 
@@ -203,7 +203,7 @@ def get_data_period(message, user_id, type, ex_in, sum_all, plot):
             sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=True)
             bot.send_message(message.chat.id, text="Сумма:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
             if sum_all == "all":
-                html_to_jpg(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, all_period=True)
+                html_statistic(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, all_period=True)
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
         return
     if len(message.text) != 21 or is_incorrect_date_format(message.text[:10]) or is_incorrect_date_format(
@@ -226,7 +226,7 @@ def get_data_period(message, user_id, type, ex_in, sum_all, plot):
                              data_end=data_end)
             bot.send_message(message.chat.id, text="Сумма:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
             if sum_all == "all":
-                html_to_jpg(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, data_start=data_start, data_end=data_end)
+                html_statistic(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, data_start=data_start, data_end=data_end)
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 

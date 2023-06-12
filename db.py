@@ -13,8 +13,11 @@ ex_default_categories = {'Развлечения': 1, 'Автомобиль': 2,
                          'Подарки': 7, 'Семейные расходы': 8, 'Услуги': 9, 'Другое': 10}
 ex_default_categories_rev = {1: 'Развлечения', 2: 'Автомобиль', 3: 'Дом', 4: 'Здоровье', 5: 'Одежда', 6: 'Питание',
                              7: 'Подарки', 8: 'Семейные расходы', 9: 'Услуги', 10: 'Другое'}
+ex_default_categories_rev_eng = {1: 'Entertainment', 2: 'Automobile', 3: 'House', 4: 'Health', 5: 'Cloth', 6: 'Food',
+                             7: 'Gifts', 8: 'Family expenses', 9: 'Services', 10: 'Other'}
 in_default_categories = {'Зарплата': 1, 'Подарок': 2, 'Инвестиции': 3, 'Другое': 4}
 in_default_categories_rev = {1: 'Зарплата', 2: 'Подарок', 3: 'Инвестиции', 4: 'Другое'}
+in_default_categories_rev_eng = {1: 'Salary', 2: 'Gift', 3: 'Investments', 4: 'Other'}
 
 kinds_of_notification = {0: "Ежедневные", 1: "По дате"}
 
@@ -185,8 +188,8 @@ def init_db(conn, flag_drop: bool = False):
     );''')
 
     conn.commit()
-    add_real_data(user_id=219102395, name_of_file='personal_transactions_bot')
-    add_real_data(user_id=1067952257, name_of_file='personal_transactions_bot')
+    # add_real_data(user_id=219102395, name_of_file='personal_transactions_bot')
+    # add_real_data(user_id=1067952257, name_of_file='personal_transactions_bot')
 
 
 def add_default_categories(conn, user_id: int):
@@ -352,13 +355,13 @@ def get_all_statistic(conn, user_id: int, type: int, ex_in: str, all_period=Fals
 
     c.execute(sql)
     table = from_db_cursor(c)
-    table.field_names = ['Сумма', 'Дата', 'Категория']
+    table.field_names = ['Sum', 'Date', 'Category']
     if ex_in == 'expenses':
         for i, _ in enumerate(table.rows):
-            table.rows[i][2] = ex_default_categories_rev[table.rows[i][2]]
+            table.rows[i][2] = ex_default_categories_rev_eng[table.rows[i][2]]
     else:
         for i, _ in enumerate(table.rows):
-            table.rows[i][2] = in_default_categories_rev[table.rows[i][2]]
+            table.rows[i][2] = in_default_categories_rev_eng[table.rows[i][2]]
     return table
 
 '''if (ex_in == 'ex'):
