@@ -715,10 +715,6 @@ def messages(message):
     if message.text == 'delete notification':
         bot.send_message(message.chat.id, 'balance' + ':\n' + one_tuple_to_str(
             db.sql_execute(sql=f"SELECT total FROM balance WHERE user_id={message.from_user.id};")))
-    if message.text[0:2] == 'qr':
-        bot.send_message(message.chat.id,
-                         'Отправь мне фотографию qr кода')
-        bot.register_next_step_handler(message, qr_code_reader)
 
 
 def qr_get_phone(message, qr_code, user_id, type):
