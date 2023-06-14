@@ -27,9 +27,11 @@ import json
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
+
 matplotlib.use('agg')
 
 import seaborn as sns
+
 custom_params = {'patch.force_edgecolor': False}
 sns.set_theme(rc=custom_params)
 
@@ -136,7 +138,8 @@ def start_message(message):
                                       "📃 Статистика - баланс, все операции, диаграмма по категориям \n"
                                       "✔️ Дисконтные карты - добавление, получение и удаление карт \n"
                                       "🔔 Напоминания - добавление, просмотр и удаление напоминаний \n"
-                                      "🪄 Предсказания расходов - предсказание расходов с помощью методов машинного обучения", reply_markup=menu_key())
+                                      "🪄 Предсказания расходов - предсказание расходов с помощью методов машинного обучения",
+                     reply_markup=menu_key())
     db.add_user(user_id=message.from_user.id, name=message.from_user.username)
 
 
@@ -158,7 +161,6 @@ def add_expenses_or_incomes_menu(message, user_id, type, ex_in):
                                                                               type=type, ex_in=ex_in))
 
 
-
 def is_incorrect_date_format(string):
     try:
         valid_date = time.strptime(string, '%Y-%m-%d')
@@ -173,7 +175,6 @@ def is_incorrect_date_format(string):
 
 def add_date(message, user_id, type, sum, ex_in):
     if message.text == "Текущая дата":
-        # datetime.utcfromtimestamp(message.date).strftime('%Y-%m-%d')
         db.add_money_transfer(user_id=user_id, sum=sum, type=type,
                               date=tconv(message.date), ex_in=ex_in)
         bot.send_message(message.chat.id, text="Записано!", reply_markup=types.ReplyKeyboardRemove())
@@ -197,7 +198,8 @@ def get_data_period(message, user_id, type, ex_in, sum_all, plot):
             plt.pie(y, labels=lables)
             plt.savefig(f"files/{message.chat.id}/image.jpg")
             plt.clf()
-            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'), reply_markup=types.ReplyKeyboardRemove())
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'),
+                           reply_markup=types.ReplyKeyboardRemove())
             os.remove(f"files/{message.chat.id}/image.jpg")
         else:
             sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=True)
@@ -215,18 +217,21 @@ def get_data_period(message, user_id, type, ex_in, sum_all, plot):
         data_start = message.text[:10]
         data_end = message.text[11:]
         if plot == "pie":
-            [y, lables] = db.get_sum_group(user_id=user_id, ex_in=ex_in, all_period=False, data_start=data_start, data_end=data_end)
+            [y, lables] = db.get_sum_group(user_id=user_id, ex_in=ex_in, all_period=False, data_start=data_start,
+                                           data_end=data_end)
             plt.pie(y, labels=lables)
             plt.savefig(f"files/{message.chat.id}/image.jpg")
             plt.clf()
-            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'), reply_markup=types.ReplyKeyboardRemove())
+            bot.send_photo(message.chat.id, photo=open(f"files/{message.chat.id}/image.jpg", 'rb'),
+                           reply_markup=types.ReplyKeyboardRemove())
             os.remove(f"files/{message.chat.id}/image.jpg")
         else:
             sum = db.get_sum(user_id=user_id, type=type, ex_in=ex_in, all_period=False, data_start=data_start,
                              data_end=data_end)
             bot.send_message(message.chat.id, text="Сумма:\n" + str(sum), reply_markup=types.ReplyKeyboardRemove())
             if sum_all == "all":
-                html_statistic(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, data_start=data_start, data_end=data_end)
+                html_statistic(chat_id=message.chat.id, user_id=user_id, type=type, ex_in=ex_in, data_start=data_start,
+                               data_end=data_end)
         bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
 
 
@@ -273,7 +278,8 @@ def is_incorrect_time_format(string):
 def get_rem_time(message, user_id, type, cat, day=-1):
     if message.text != "Текущее время" and is_incorrect_time_format(message.text):
         mesg = bot.send_message(message.chat.id, "😥 Неправильный формат HH:MM\nВведите еще раз:")
-        bot.register_next_step_handler(mesg, lambda m: get_rem_time(message=m, user_id=user_id, type=type, cat=cat, day=day))
+        bot.register_next_step_handler(mesg,
+                                       lambda m: get_rem_time(message=m, user_id=user_id, type=type, cat=cat, day=day))
     else:
         mesg = bot.send_message(message.chat.id, "Введите текст:", reply_markup=types.ReplyKeyboardRemove())
         time = message.text if message.text != "Текущее время" else tconv_time(message.date)
@@ -288,7 +294,7 @@ def get_rem_text(message, user_id, type, cat, day, time):
 
 
 def get_pred_day(message, user_id, model):
-    if not(message.text.isdigit()) or int(message.text) < 0:
+    if not (message.text.isdigit()) or int(message.text) < 0:
         mesg = bot.send_message(message.chat.id, "😥 Неправильный формат\nВведите еще раз:")
         bot.register_next_step_handler(mesg, lambda m: get_pred_day(message=m, user_id=user_id, model=model))
     else:
@@ -301,7 +307,8 @@ def get_pred_day(message, user_id, model):
                 return
 
             str_start_date = pd.Timestamp(message.date, unit='s', tz='US/Pacific').strftime('%Y-%m-%d')
-            pd_dates = pd.DataFrame(pd.date_range(str_start_date, freq=datetime.timedelta(seconds=86400), periods=int(message.text)))
+            pd_dates = pd.DataFrame(
+                pd.date_range(str_start_date, freq=datetime.timedelta(seconds=86400), periods=int(message.text)))
             pd_dates.columns = ['date']
 
             res = predict.catboost(df=df, new_df=pd_dates)
@@ -325,7 +332,6 @@ def get_pred_day(message, user_id, model):
                 bot.send_message(message.chat.id, "Слишком мало информации о расходах :(")
                 bot.send_message(message.chat.id, text="📌 Меню", reply_markup=menu_key())
                 return
-
 
             str_start_date = pd.Timestamp(message.date, unit='s', tz='US/Pacific').strftime('%Y-%m-%d')
             pd_dates = pd.DataFrame(
@@ -557,7 +563,8 @@ def callback_query(call):
                                                                                     "_")] == "all" else call.data[
                                                                                                         len("data_ex_"):call.data.rfind(
                                                                                                             "_")],
-                                                                     ex_in=call.data[5:7], sum_all=call.data[-3:], plot="pie" if call.data[8:] == "pie" else ""))
+                                                                     ex_in=call.data[5:7], sum_all=call.data[-3:],
+                                                                     plot="pie" if call.data[8:] == "pie" else ""))
 
         if call.data == "cards":
             key = types.InlineKeyboardMarkup()
@@ -694,7 +701,8 @@ def callback_query(call):
         if call.data[:len("predict_")] == "predict_":
             mesg = bot.send_message(call.message.chat.id, "Введите количество дней для предсказания")
             bot.register_next_step_handler(mesg,
-                                           lambda m: get_pred_day(message=m, user_id=call.from_user.id, model=call.data[len("predict_"):]))
+                                           lambda m: get_pred_day(message=m, user_id=call.from_user.id,
+                                                                  model=call.data[len("predict_"):]))
 
 
 @bot.message_handler(content_types=["text"])
@@ -737,10 +745,12 @@ def qr_get_phone(message, qr_code, user_id, type):
                 bot.send_message(message.chat.id, 'Слишком много запросов, попробуйте позже')
                 raise Exception('Слишком много запросов')
             mesg = bot.send_message(chat_id=message.chat.id, text="Введите код из смс: ")
-            bot.register_next_step_handler(mesg, lambda m: qr_get_code(message=m, phone=message.text, qr_code=qr_code, user_id=user_id, type=type))
+            bot.register_next_step_handler(mesg, lambda m: qr_get_code(message=m, phone=message.text, qr_code=qr_code,
+                                                                       user_id=user_id, type=type))
         except Exception as e:
             print(e)
-            bot.send_message(message.chat.id, 'Возможно qr код не содержит нужную информацию. Попробуйте еще раз :(', reply_markup=menu_key())
+            bot.send_message(message.chat.id, 'Возможно qr код не содержит нужную информацию. Попробуйте еще раз :(',
+                             reply_markup=menu_key())
 
 
 def qr_get_code(message, phone, qr_code, user_id, type):
@@ -814,7 +824,6 @@ def qr_code_reader(message, user_id, type):
 
 
 def main():
-    # TODO: добавить проверку соединения и тд
     th = Thread(target=notify)
     th.start()
     bot.polling()
@@ -824,6 +833,5 @@ def main():
 
 
 if __name__ == '__main__':
-    # TODO: нужен ли тут flag_drop=True ?
     db.init_db(flag_drop=False)
     main()
