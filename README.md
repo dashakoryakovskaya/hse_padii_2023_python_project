@@ -1,5 +1,5 @@
 # Telegram бот для отслеживания личных финансов
-@finance_tracking_bot
+@track_your_finance_bot
 
 [ссылка на презентацию](https://docs.google.com/presentation/d/1JhkHC6f45zr7iN4x3Zty58pGp2D-dvCZo03XfAH-Cyg/edit?usp=sharing)
 
