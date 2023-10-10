@@ -1,6 +1,6 @@
 import sqlite3
 import db
-import config
+import config1
 import predict
 
 import telebot
@@ -40,7 +40,7 @@ tconv_time = lambda x: time.strftime("%H:%M", time.localtime(x))
 
 STOP_BOT_FLAG = False
 
-bot = telebot.TeleBot(config.token)
+bot = telebot.TeleBot(config1.token)
 
 
 def html_statistic(chat_id, user_id, type, ex_in, all_period=False, data_start='', data_end=''):
